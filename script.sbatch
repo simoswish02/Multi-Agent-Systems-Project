@@ -12,4 +12,8 @@
 #SBATCH --chdir=/scratch.hpc/simone.rimondi5/Multi-Agent-Systems-Project
 #SBATCH --gres=gpu:1
 
-venv/bin/python3 main.py
+# Keep temp files off the tiny node-local /tmp (~2G free); use scratch.
+export TMPDIR=/scratch.hpc/simone.rimondi5/tmp
+mkdir -p "$TMPDIR"
+
+venv/bin/python3 main.py --mode train
