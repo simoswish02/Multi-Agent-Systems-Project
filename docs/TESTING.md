@@ -1,3 +1,9 @@
+> **Historical document** — inherited from the RL-course project *before* the
+> Multi-Agent-Systems fault extension (random faults, Broken channel, CTX_DIM=5,
+> obstacle-density/fault DR, eval-only BFS auto-nav). Numbers such as channel
+> counts or context dims may be stale here; the current references are
+> [ARCHITECTURE.md](ARCHITECTURE.md), [ENV.md](ENV.md), [TRAINING.md](TRAINING.md).
+
 # Testing / Evaluation Phase
 
 Methodology and tooling for the **post-training evaluation** of the multi-drone

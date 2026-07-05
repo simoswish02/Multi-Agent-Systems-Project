@@ -235,3 +235,36 @@ smoke test.
 
 - **No automated test suite.** The smoke checks used in this audit should be
   committed as `tests/`. (Tracked in `docs/REFACTOR_REPORT.md`.)
+
+---
+
+## Design decisions of the fault extension (audited-correct — do not "fix")
+
+Added with the Multi-Agent-Systems fault extension (random drone failures).
+These look like bugs at first glance but are deliberate:
+
+- **A fault is a truncation, not a termination.** When a drone breaks, its
+  pending n-step window is flushed with bootstrapping (`disc = γ^k`), not with
+  a terminal flag. Faults are independent of state and action; marking them
+  terminal would teach the network that the states preceding a random fault
+  have no future value — a bias. Same rationale as time-limit truncation
+  (Pardo et al. 2018, Invariant 7).
+- **Wrecks still consume turns.** `step_agent` on a dead drone is a no-op that
+  increments `step_count`. This is intentional: the time budget
+  (`max_steps · n_agents`) must not grow when drones die — "the step limit
+  will remain active" is a requirement of the MAS proposal.
+- **Wrecks do not block, collide, or appear in `Other_Position`.** A crash
+  site becoming an obstacle could wall off the target and break the
+  reset-time BFS-reachability guarantee. Wrecks appear only in the `Broken`
+  channel, and only for drones that have learned of the crash.
+- **`n_alive_belief` is per-drone, not global.** Two drones can disagree about
+  how many teammates are alive — that is the decentralized design working as
+  intended (the beacon knowledge has simply not propagated yet). Never
+  "simplify" it to `agent_alive.sum()`.
+- **Fault draws come from `env.rng` after map generation**, so a fixed
+  `reset(seed=…)` reproduces the layout *and* the fault sequence. Guarding the
+  draw with `if fault_prob > 0` keeps zero-fault runs bit-identical to the
+  pre-extension environment.
+- **Dead drones get no `shared_target_reward`.** Their windows were flushed at
+  fault time, so `apply_team_terminal`'s empty-deque guard skips them. The
+  team bonus goes only to drones still operational at the find.

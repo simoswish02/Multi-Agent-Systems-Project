@@ -64,50 +64,72 @@ skipped (already done); the active phase restarts at `ep_in_phase + 1` with
 
 ## 3. Domain randomization (DR)
 
-Per episode the loop samples a context and applies it to the env **before**
-`reset()`:
+Per episode the loop samples the DR parameters and applies them to the env
+**before** `reset()`:
 
 ```python
-ctx_params = sample_ctx_params(dr_cfg)        # uniform randint in [min, max]
-env.set_domain_params(**ctx_params)           # FOV / comm / team now match
+ctx_params = sample_ctx_params(dr_cfg)        # randint for ints, uniform for floats
+env.set_domain_params(**ctx_params)           # FOV / comm / team / density / faults
 obs, info = env.reset()
 n_agents  = env.n_agents                       # read back the sampled team size
 ```
 
 `sample_ctx_params(dr_cfg, rng=None)` draws `vision_radius`, `comm_range`,
-`n_agents` with **inclusive** `randint`. An optional `random.Random` instance
-makes sampling deterministic (used by evaluation, see §7). Default ranges
-(`configs/default.yaml`):
+`n_agents` with **inclusive** `randint`, plus float `obstacle_density` and
+`fault_prob` with `uniform` when their ranges are present in the DR config. An
+optional `random.Random` instance makes sampling deterministic (used by
+evaluation, see §7). Default ranges (`configs/default.yaml`):
 
 | Param | Range | Context normalizer (= max) |
 |-------|-------|----------------------------|
 | `vision_radius` | `[1, 6]` | 6 |
 | `comm_range` | `[2, 12]` | 12 |
 | `n_agents` | `[1, 4]` | 4 |
+| `obstacle_density` | `[0.10, 0.30]` | — (not a context entry) |
+| `fault_prob` | `[0.0, 0.003]` | — (not a context entry) |
+
+`obstacle_density` and `fault_prob` randomize the *world* but are deliberately
+not fed to the network: obstacles are visible in the observation, and a real
+drone cannot know its own fault rate. With `max_steps = 200` rounds,
+`fault_prob = 0.003` means ≈45 % chance a given drone breaks at some point in
+the episode — the DR range `[0, 0.003]` therefore spans "no faults" to "losing
+teammates is common".
 
 `set_domain_params` recomputes the env's vision offsets when the radius changes,
-updates `comm_range`, and updates `n_agents` (the next `reset()` reallocates the
-per-agent map arrays). Applying DR to the env is what makes the context vector
-*coherent* with what the drone actually observes (see Invariant 5 in ARCHITECTURE).
+updates `comm_range`, `n_agents` (the next `reset()` reallocates the per-agent
+map arrays), `obstacle_density`, and `fault_prob`. Applying DR to the env is
+what makes the context vector *coherent* with what the drone actually observes
+(see Invariant 5 in ARCHITECTURE).
 
 ---
 
 ## 4. `ctx_to_numpy` and the context vector
 
 ```python
-ctx_to_numpy(ctx_params, ctx_norm) -> (3,) float32
+ctx_to_numpy(ctx_params, ctx_norm, agent_id, n_alive) -> (5,) float32
   = [ vision_radius / ctx_norm["vision_radius"],     # /6
       comm_range    / ctx_norm["comm_range"],        # /12
-      n_agents      / ctx_norm["n_agents"] ]         # /4
+      n_agents      / ctx_norm["n_agents"],          # /4
+      agent_id      / ctx_norm["n_agents"],          # /4
+      n_alive       / ctx_norm["n_agents"] ]         # /4
 ```
 
 `ctx_norm` is passed in explicitly (no module-level constants) so every value
-traces back to the config. The drone position is **not** in the context — it
-rides in the `Own_Position` global observation channel, from which `forward()`
-recovers the integer crop coordinates via argmax. None of the three components
-changes within an episode, so the context is **constant per episode** (one vector
-shared by every agent, stored as-is in each transition). No separate position
-field is needed in the replay buffer: position is already inside `obs_global`.
+traces back to the config; `agent_id` and `n_alive` reuse the `n_agents`
+denominator. The drone position is **not** in the context — it rides in the
+`Own_Position` global observation channel, from which `forward()` recovers the
+integer crop coordinates via argmax.
+
+- `agent_id` breaks the parameter-sharing symmetry (all drones spawn on the
+  same corner with identical observations — the id is what lets the shared
+  policy assign different roles from step 0).
+- `n_alive` is `env.n_alive_belief(i)` — the team size this drone *believes*
+  is operational, from its own fault knowledge (see ENV §4).
+
+Because the belief can change as faults happen and knowledge spreads, the
+context is **rebuilt every round per drone**, and the transition's next-state
+ctx is rebuilt after the step (`run_phase` stores `ctx_before` / `next_ctx`
+separately). The context is **no longer constant within an episode**.
 
 ---
 
@@ -133,6 +155,12 @@ exactly to `r + γ · Q(s') · (1 − terminated)`.
   of each trajectory is not lost).
 - **`terminated`, not `truncated`, ends a window.** Time-limit truncation is
   non-terminal and must still bootstrap (Pardo et al. 2018).
+- **A fault is a truncation for that drone.** When `info["just_broke"]` fires,
+  `run_phase` immediately flushes that drone's pending window (bootstrapped,
+  `disc = γ^k`) and stops pushing for it. Faults are independent of state and
+  action, so ending the window terminally (zero future value) would bias the
+  Q-estimates of the states that happened to precede the fault. Wrecks' no-op
+  turns generate **no** transitions.
 
 ### Cooperative terminal reward (`shared_target_reward`)
 
@@ -141,8 +169,10 @@ adds `target_reward` to every *other* agent's most-recent pending step and marks
 each agent's last step terminal (so its window stops bootstrapping). This shares
 credit for the team success. It **requires `n_step >= 2`** — with `n_step == 1`
 every step is emitted immediately and nothing remains in the windows to credit
-(the loop prints a warning if misconfigured). Default config: `n_step = 3`,
-`shared_target_reward: true`.
+(the loop prints a warning if misconfigured). Drones that broke earlier were
+flushed at fault time, so their deques are empty and `apply_team_terminal`
+skips them — **the team bonus only goes to drones still operational at the
+find**. Default config: `n_step = 3`, `shared_target_reward: true`.
 
 ---
 
@@ -304,6 +334,8 @@ Logged from `run_phase` (`{name}` is the phase name). Open with
 | `{name}/found_target` | `1.0` if the target was found |
 | `{name}/lr` | current learning rate |
 | `{name}/dr_vision_radius`, `{name}/dr_comm_range`, `{name}/dr_n_agents` | sampled DR values |
+| `{name}/dr_obstacle_density`, `{name}/dr_fault_prob` | sampled env-level DR values |
+| `{name}/n_broken` | drones lost to faults this episode |
 
 **Per phase, every `eval_every` episodes:**
 
