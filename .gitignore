@@ -223,3 +223,11 @@ __marimo__/
 # NOTE: env/ in this project is the environment SOURCE PACKAGE (DroneSearchEnv),
 # not a virtualenv — re-include it despite the env/ / ENV/ patterns above.
 !/env/
+
+# Training run outputs — never commit these (huge, machine-local). Keeps the
+# Source Control view usable when training on the HPC cluster via Remote-SSH.
+/checkpoints/
+/runs/
+/logs/
+/eval_results/
+*.pt
