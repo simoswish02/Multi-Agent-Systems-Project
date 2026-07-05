@@ -14,7 +14,12 @@ from collections import defaultdict
 #   3  Target       – target position if ever seen
 #   4  Own_Position – this drone's own cell (single 1.0); the network reads it
 #                     back (argmax) to crop the local patch
-GLOBAL_CHANNELS = 5
+#   5  Broken       – crash sites of broken teammates KNOWN to this drone
+#                     (learned via distress beacon / comm fusion, not an oracle)
+GLOBAL_CHANNELS = 6
+
+# Index of the Broken channel within the global map.
+BROKEN_CHANNEL = 5
 
 # Local stream: fine-grained detail fed to the local CNN
 #   0  Visited
@@ -42,8 +47,9 @@ class DroneSearchEnv(gym.Env):
 
     Observation (per agent): dict with two flat arrays
     -------------------------------------------------------
-      'global' : shape (GLOBAL_CHANNELS * grid_size^2,)  = (5 * 1024,) = (5120,)
-                 channels: [Visited, Obstacle, Trajectory, Target, Own_Position]
+      'global' : shape (GLOBAL_CHANNELS * grid_size^2,)  = (6 * 1024,) = (6144,)
+                 channels: [Visited, Obstacle, Trajectory, Target, Own_Position,
+                            Broken]
       'local'  : shape (LOCAL_CHANNELS  * grid_size^2,)  = (5 * 1024,) = (5120,)
                  channels: [Visited, Obstacle, Trajectory, Target, Other_Position]
 
@@ -51,6 +57,24 @@ class DroneSearchEnv(gym.Env):
     (a single 1.0 at env.agent_pos[i]). The network recovers the crop
     coordinates from that channel, so position is a spatial signal rather than
     a context scalar.
+
+    Fault model (random drone failures)
+    -----------------------------------
+    At the start of its turn each live drone breaks with probability
+    ``fault_prob`` (per step). A broken drone stops for the rest of the
+    episode: it no longer moves, senses, or communicates; its turns become
+    no-ops (the global clock still ticks, so the time budget is unaffected).
+    The wreck does NOT block movement and is excluded from collisions and
+    from the Other_Position channel.
+
+    Fault knowledge is decentralized: the wreck emits a distress beacon.
+    A live drone passing within ``comm_range`` of the crash site (or seeing
+    it inside its vision box) records it in its OWN Broken map, and that
+    knowledge then spreads through the usual comm map-fusion — exactly like
+    Visited/Obstacle/Target knowledge. ``n_alive_belief(i)`` exposes the
+    team size drone ``i`` believes is still operational.
+
+    When every drone is broken the episode is truncated early (non-terminal).
 
     Reward per agent step:
       +target_reward         if this drone reaches the target
@@ -83,6 +107,10 @@ class DroneSearchEnv(gym.Env):
         self.target_reward     = env_cfg["target_reward"]
         self.exploration_bonus = env_cfg.get("exploration_bonus",  0.05)
         self.collision_penalty = env_cfg.get("collision_penalty",  -0.5)
+        # Per-step probability that a live drone breaks at the start of its
+        # turn (0 disables faults). Randomized per episode via DR in training;
+        # set a fixed value from CLI/GUI in eval/simulate.
+        self.fault_prob        = env_cfg.get("fault_prob", 0.0)
         # Optional fixed spawn corner index (0=top-left .. 3=bottom-right); None
         # keeps the per-episode random corner used during training.
         self.spawn_corner      = env_cfg.get("spawn_corner", None)
@@ -118,6 +146,10 @@ class DroneSearchEnv(gym.Env):
         self.agent_obstacle   = None
         self.agent_target     = None
         self.agent_trajectory = None
+        self.agent_alive      = None   # (na,) bool — False once a drone broke
+        self.crash_pos        = None   # dict idx -> (r, c) ground-truth wrecks
+        self.agent_broken     = None   # (na, H, W) crash sites KNOWN per drone
+        self.agent_known_crashed = None  # list[set[int]] crashed ids per drone
         self._known_mask      = None
         self.step_count       = 0
         self._current_agent   = 0      # round-robin pointer for the gym step()
@@ -140,7 +172,9 @@ class DroneSearchEnv(gym.Env):
         self._vis_dc = dc_grid.ravel()
 
     def set_domain_params(self, vision_radius: int = None,
-                          comm_range: int = None, n_agents: int = None):
+                          comm_range: int = None, n_agents: int = None,
+                          obstacle_density: float = None,
+                          fault_prob: float = None):
         """Set the per-episode domain-randomisation parameters.
 
         Call this BEFORE ``reset()`` so the next episode's observations are
@@ -153,6 +187,8 @@ class DroneSearchEnv(gym.Env):
             vision_radius: New field-of-view radius (recomputes vision offsets).
             comm_range: New communication range for map fusion.
             n_agents: New number of drones for the next episode.
+            obstacle_density: New obstacle density for the next generated grid.
+            fault_prob: New per-step drone fault probability.
         """
         if vision_radius is not None and vision_radius != self.vision_radius:
             self.vision_radius = int(vision_radius)
@@ -161,6 +197,10 @@ class DroneSearchEnv(gym.Env):
             self.comm_range = int(comm_range)
         if n_agents is not None:
             self.n_agents = int(n_agents)
+        if obstacle_density is not None:
+            self.obstacle_density = float(obstacle_density)
+        if fault_prob is not None:
+            self.fault_prob = float(fault_prob)
 
     # ------------------------------------------------------------------
     # Reset
@@ -190,6 +230,12 @@ class DroneSearchEnv(gym.Env):
         self.agent_target     = np.zeros((na, mg, mg), dtype=np.float32)
         self.agent_trajectory = np.zeros((na, mg, mg), dtype=np.float32)
 
+        # Fault state: everyone starts operational, no known crash sites.
+        self.agent_alive         = np.ones(na, dtype=bool)
+        self.crash_pos           = {}
+        self.agent_broken        = np.zeros((na, mg, mg), dtype=np.float32)
+        self.agent_known_crashed = [set() for _ in range(na)]
+
         self._known_mask    = np.zeros((self.H, self.W), dtype=bool)
         self.step_count     = 0
         self._current_agent = 0
@@ -212,6 +258,7 @@ class DroneSearchEnv(gym.Env):
             "action_masks": masks,
             "found": False,
             "step": 0,
+            "n_alive": na,
         }
         return obs, info
 
@@ -221,6 +268,21 @@ class DroneSearchEnv(gym.Env):
 
     def step_agent(self, agent_idx: int, action: int):
         assert not self.done, "Episode ended – call reset()"
+
+        # --- Random fault model ------------------------------------------
+        # A broken drone's turn is a no-op (it cannot move, sense, or
+        # communicate) but the clock still ticks — losing drones does not
+        # buy the team extra time.
+        if not self.agent_alive[agent_idx]:
+            return self._noop_turn(agent_idx, just_broke=False)
+
+        # A live drone may break at the start of its turn, before moving.
+        # Drawn from self.rng AFTER map generation, so a fixed reset seed
+        # reproduces both the layout and the fault sequence.
+        if self.fault_prob > 0 and self.rng.random() < self.fault_prob:
+            self.agent_alive[agent_idx] = False
+            self.crash_pos[agent_idx]   = self.agent_pos[agent_idx]
+            return self._noop_turn(agent_idx, just_broke=True)
 
         dr, dc = ACTIONS[action]
         r, c   = self.agent_pos[agent_idx]
@@ -241,15 +303,18 @@ class DroneSearchEnv(gym.Env):
             self.agent_pos[agent_idx] = (nr, nc)
             self.agent_trajectory[agent_idx, nr, nc] += 1.0
 
+            # Wrecks are on the ground and do not collide with flying drones.
             collision_count = sum(
                 1 for k in range(self.n_agents)
-                if k != agent_idx and self.agent_pos[k] == self.agent_pos[agent_idx]
+                if k != agent_idx and self.agent_alive[k]
+                and self.agent_pos[k] == self.agent_pos[agent_idx]
             )
             if collision_count > 0:
                 reward += self.collision_penalty * collision_count
 
         old_known = self._known_mask.copy()
         self._update_map(agent_idx)
+        self._detect_wrecks(agent_idx)
         self._communicate()
         self._sync_known_mask()
 
@@ -277,8 +342,42 @@ class DroneSearchEnv(gym.Env):
             "agent_positions": list(self.agent_pos),
             "known_cells":     int(self._known_mask.sum()),
             "action_mask":     mask_i,
+            "broken":          False,
+            "just_broke":      False,
+            "n_alive":         int(self.agent_alive.sum()),
         }
         return obs_i, reward, terminated, truncated, info
+
+    def _noop_turn(self, agent_idx: int, just_broke: bool):
+        """Consume a broken drone's turn: only the global clock advances.
+
+        Returns the standard 5-tuple with reward 0 and terminated=False —
+        a fault is a truncation-like event for that drone, never a terminal
+        one (it is independent of state/action, so its future value must
+        still be bootstrapped by learners). Once every drone is down the
+        episode is truncated early: nothing can change anymore.
+        """
+        self.step_count += 1
+        truncated = (
+            self.step_count >= self.max_steps * self.n_agents
+            or not self.agent_alive.any()
+        )
+        self.done = self.done or truncated
+        self.last_rewards[agent_idx] = 0.0
+
+        obs_i = self._get_obs(agent_idx)
+        info = {
+            "step":            self.step_count,
+            "found":           False,
+            "new_cells":       0,
+            "agent_positions": list(self.agent_pos),
+            "known_cells":     int(self._known_mask.sum()),
+            "action_mask":     self._get_action_mask(agent_idx),
+            "broken":          True,
+            "just_broke":      just_broke,
+            "n_alive":         int(self.agent_alive.sum()),
+        }
+        return obs_i, 0.0, False, truncated, info
 
     def step(self, action: int):
         """Gymnasium-standard single-action step
@@ -305,6 +404,15 @@ class DroneSearchEnv(gym.Env):
 
     def get_all_masks(self):
         return [self._get_action_mask(i) for i in range(self.n_agents)]
+
+    def n_alive_belief(self, agent_idx: int) -> int:
+        """Team size drone ``agent_idx`` BELIEVES is still operational.
+
+        ``n_agents`` minus the crashes this drone knows about — its own
+        (beacon/fusion-acquired) knowledge, not a global oracle. Feeds the
+        ``n_alive`` slot of the context vector.
+        """
+        return self.n_agents - len(self.agent_known_crashed[agent_idx])
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -352,7 +460,33 @@ class DroneSearchEnv(gym.Env):
         self.agent_visited [agent_idx, ib_nrs[is_free], ib_ncs[is_free]] = 1.0
         self.agent_target  [agent_idx, ib_nrs[is_tgt],  ib_ncs[is_tgt]]  = 1.0
 
+    def _detect_wrecks(self, agent_idx: int):
+        """Record crash sites whose distress beacon reaches this drone.
+
+        A wreck is detected when its cell is within ``comm_range`` (the
+        beacon uses the same radio metric as live communication) or inside
+        the drone's vision box (the wreck is physically visible). Knowledge
+        is stored per-drone and spreads through ``_communicate`` afterwards,
+        exactly like map knowledge — there is no global fault oracle.
+        """
+        if not self.crash_pos:
+            return
+        r, c = self.agent_pos[agent_idx]
+        for k, (kr, kc) in self.crash_pos.items():
+            if k in self.agent_known_crashed[agent_idx]:
+                continue
+            d = (abs(r - kr) + abs(c - kc)) if self.comm_metric == "manhattan" \
+                else ((r - kr) ** 2 + (c - kc) ** 2) ** 0.5
+            seen = max(abs(r - kr), abs(c - kc)) <= self.vision_radius
+            if d <= self.comm_range or seen:
+                self.agent_known_crashed[agent_idx].add(k)
+                self.agent_broken[agent_idx, kr, kc] = 1.0
+
     def _communicate(self):
+        # Broken drones neither transmit nor receive: only live drones can
+        # form comm groups. Their frozen maps keep whatever was fused before
+        # the fault.
+        alive = [i for i in range(self.n_agents) if self.agent_alive[i]]
         parent = list(range(self.n_agents))
 
         def find(x):
@@ -361,8 +495,8 @@ class DroneSearchEnv(gym.Env):
                 x = parent[x]
             return x
 
-        for i in range(self.n_agents):
-            for j in range(i + 1, self.n_agents):
+        for ii, i in enumerate(alive):
+            for j in alive[ii + 1:]:
                 ri, ci = self.agent_pos[i]
                 rj, cj = self.agent_pos[j]
                 d = (abs(ri - rj) + abs(ci - cj)) if self.comm_metric == "manhattan" \
@@ -373,7 +507,7 @@ class DroneSearchEnv(gym.Env):
                         parent[pi] = pj
 
         groups = defaultdict(list)
-        for i in range(self.n_agents):
+        for i in alive:
             groups[find(i)].append(i)
 
         for members in groups.values():
@@ -382,9 +516,17 @@ class DroneSearchEnv(gym.Env):
                 merged_vis = self.agent_visited [idxs].max(axis=0)
                 merged_obs = self.agent_obstacle[idxs].max(axis=0)
                 merged_tgt = self.agent_target  [idxs].max(axis=0)
+                merged_brk = self.agent_broken  [idxs].max(axis=0)
                 self.agent_visited [idxs] = merged_vis
                 self.agent_obstacle[idxs] = merged_obs
                 self.agent_target  [idxs] = merged_tgt
+                self.agent_broken  [idxs] = merged_brk
+                # Fault knowledge fuses like the maps do (set union).
+                merged_crashed = set().union(
+                    *(self.agent_known_crashed[k] for k in idxs)
+                )
+                for k in idxs:
+                    self.agent_known_crashed[k] = set(merged_crashed)
 
     def _get_obs(self, agent_idx: int) -> dict:
         """
@@ -394,7 +536,8 @@ class DroneSearchEnv(gym.Env):
         -------
         {
           'global': np.ndarray, shape (GLOBAL_CHANNELS * grid_size^2,)
-                    channels: [Visited, Obstacle, Trajectory, Target, Own_Position]
+                    channels: [Visited, Obstacle, Trajectory, Target,
+                               Own_Position, Broken]
           'local':  np.ndarray, shape (LOCAL_CHANNELS * grid_size^2,)
                     channels: [Visited, Obstacle, Trajectory, Target, Other_Position]
         }
@@ -412,11 +555,13 @@ class DroneSearchEnv(gym.Env):
             self.agent_trajectory[agent_idx] / _TRAJ_CAP, 0.0, 1.0
         )                                           # (H, W), normalised
 
-        # Other-drone positions within vision radius (local stream only)
+        # Other-drone positions within vision radius (local stream only).
+        # Only LIVE teammates appear here; wrecks show up in the Broken
+        # channel instead (once known to this drone).
         mg = self.grid_size
         others_pos = np.zeros((mg, mg), dtype=np.float32)
         for k in range(self.n_agents):
-            if k == agent_idx:
+            if k == agent_idx or not self.agent_alive[k]:
                 continue
             rk, ck = self.agent_pos[k]
             if abs(rk - r) <= self.vision_radius and abs(ck - c) <= self.vision_radius:
@@ -427,13 +572,14 @@ class DroneSearchEnv(gym.Env):
         own_pos = np.zeros((mg, mg), dtype=np.float32)
         own_pos[r, c] = 1.0
 
-        # Global observation: 5 channels
+        # Global observation: 6 channels
         obs_global = np.concatenate([
             vis_map.ravel(),
             obs_map.ravel(),
             traj_map.ravel(),
             tgt_map.ravel(),
             own_pos.ravel(),
+            self.agent_broken[agent_idx].ravel(),
         ])  # shape: (GLOBAL_CHANNELS * mg^2,)
 
         # Local observation: 5 channels (same 4 + other-drone positions)

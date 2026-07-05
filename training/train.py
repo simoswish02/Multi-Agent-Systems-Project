@@ -42,44 +42,65 @@ def build_ctx_norm(config: dict) -> dict:
 
 
 def sample_ctx_params(dr_cfg: dict, rng=None) -> dict:
-    """Sample context parameters uniformly from domain-randomisation ranges.
+    """Sample per-episode domain-randomisation parameters.
 
     Args:
         dr_cfg: Dict with ``vision_radius`` / ``comm_range`` / ``n_agents``
-            ``[min, max]`` ranges.
+            ``[min, max]`` ranges, and optionally ``obstacle_density`` /
+            ``fault_prob`` float ranges.
         rng: Optional ``random.Random`` instance for deterministic sampling
             (used by evaluation so a fixed seed yields a fixed config). Defaults
             to the global ``random`` module.
 
     Returns:
         Dict with sampled integer ``vision_radius`` / ``comm_range`` /
-        ``n_agents``. These must be applied to the env via
-        ``DroneSearchEnv.set_domain_params`` so observations match the context.
+        ``n_agents`` (context parameters) plus, when their ranges are present,
+        float ``obstacle_density`` / ``fault_prob``. Apply the whole dict to
+        the env via ``DroneSearchEnv.set_domain_params(**params)`` so
+        observations match the context.
     """
     rnd = rng if rng is not None else random
-    return {
+    params = {
         "vision_radius": rnd.randint(*dr_cfg["vision_radius"]),
         "comm_range":    rnd.randint(*dr_cfg["comm_range"]),
         "n_agents":      rnd.randint(*dr_cfg["n_agents"]),
     }
+    # Environment-level DR: these randomize the world but are NOT context
+    # entries — the network can see obstacles in its observation, and a real
+    # drone cannot know its own fault rate.
+    if "obstacle_density" in dr_cfg:
+        lo, hi = dr_cfg["obstacle_density"]
+        params["obstacle_density"] = rnd.uniform(float(lo), float(hi))
+    if "fault_prob" in dr_cfg:
+        lo, hi = dr_cfg["fault_prob"]
+        params["fault_prob"] = rnd.uniform(float(lo), float(hi))
+    return params
 
 
-def ctx_to_numpy(ctx_params: dict, ctx_norm: dict) -> np.ndarray:
+def ctx_to_numpy(ctx_params: dict, ctx_norm: dict,
+                 agent_id: int, n_alive: int) -> np.ndarray:
     """
-    Normalise a context-parameter dict to a (CTX_DIM=3,) float32 array:
-    [vision_radius, comm_range, n_agents].
+    Normalise the context to a (CTX_DIM=5,) float32 array:
+    [vision_radius, comm_range, n_agents, agent_id, n_alive_belief].
 
     ctx_norm is passed explicitly so there are no module-level constants; all
     denominators come from the config file (domain_randomization max values).
-    The drone position is no longer part of the context — it travels as the
-    Own_Position global observation channel, from which the network recovers
-    the crop coordinates. The context is therefore constant within an episode.
+    ``agent_id`` and ``n_alive`` share the ``n_agents`` denominator (the DR
+    max team size), so no extra ctx_norm entries are needed.
+
+    ``agent_id`` is constant per drone per episode and breaks the
+    parameter-sharing symmetry (all drones spawn on the same corner with
+    identical observations). ``n_alive`` is the acting drone's own belief
+    (``env.n_alive_belief(i)``), so with faults enabled the context is NOT
+    constant within an episode — rebuild it every round.
     """
     return np.array(
         [
             ctx_params["vision_radius"] / ctx_norm["vision_radius"],
             ctx_params["comm_range"]    / ctx_norm["comm_range"],
             ctx_params["n_agents"]      / ctx_norm["n_agents"],
+            agent_id                    / ctx_norm["n_agents"],
+            n_alive                     / ctx_norm["n_agents"],
         ],
         dtype=np.float32,
     )
@@ -91,6 +112,7 @@ def make_phase_config(base_config: dict, phase: dict, max_agents: int) -> dict:
     e["n_agents"]         = phase["n_agents"]
     e["obstacle_density"] = phase.get("obstacle_density", e["obstacle_density"])
     e["max_steps"]        = phase.get("max_steps",        e["max_steps"])
+    e["fault_prob"]       = phase.get("fault_prob",       e.get("fault_prob", 0.0))
     # grid_size is fixed globally in config["env"]["grid_size"]; not set per-phase
     return cfg
 
@@ -153,22 +175,35 @@ def evaluate(
                 "n_agents":      env.n_agents,
             }
 
-        # Fixed seed: same map layout at every call to evaluate()
+        # Fixed seed: same map layout (and same fault sequence) at every call
+        # to evaluate().
         obs, info = env.reset(seed=eval_seeds[ep_idx])
         n_agents  = env.n_agents
-        # Context is constant within an episode (position now lives in the obs).
-        ctx_np    = ctx_to_numpy(ctx_params, ctx_norm)
         ep_r = 0.0
         done = False
 
         while not done:
-            masks   = [env._get_action_mask(i) for i in range(n_agents)]
-            actions = agent.select_actions_batch(obs, [ctx_np] * n_agents, masks)
+            # Only live drones act; the context carries each drone's id and
+            # its own believed alive count, so it is rebuilt every round.
+            alive_idx = [i for i in range(n_agents) if env.agent_alive[i]]
+            ctx_nps   = [
+                ctx_to_numpy(ctx_params, ctx_norm, i, env.n_alive_belief(i))
+                for i in alive_idx
+            ]
+            masks   = [env._get_action_mask(i) for i in alive_idx]
+            acts    = agent.select_actions_batch(
+                [obs[i] for i in alive_idx], ctx_nps, masks
+            )
+            actions = dict(zip(alive_idx, acts))
 
             for i in range(n_agents):
                 if done:
                     break
-                obs_i, r, terminated, truncated, info = env.step_agent(i, actions[i])
+                # Dead drones still get their (no-op) turn so the clock and
+                # the step budget behave exactly as without faults.
+                obs_i, r, terminated, truncated, info = env.step_agent(
+                    i, actions.get(i, 0)
+                )
                 obs[i]  = obs_i
                 ep_r   += r
                 done    = terminated or truncated
@@ -255,9 +290,6 @@ def run_phase(
         env.set_domain_params(**ctx_params)
         obs, info = env.reset()
         n_agents  = env.n_agents
-        # Context is constant within an episode now that position rides in the
-        # Own_Position obs channel — same vector for every agent and timestep.
-        ctx_np    = ctx_to_numpy(ctx_params, ctx_norm)
         # Per-agent n-step return accumulator (terminated, not truncated, ends a
         # window — time-limit truncation must still bootstrap, Pardo et al. 2018).
         nstep     = NStepBuffer(n_agents, n_step, gamma)
@@ -271,9 +303,22 @@ def run_phase(
                 agent.push_transition(*tr)
 
         while not done:
-            masks = [env._get_action_mask(i) for i in range(n_agents)]
+            # Only live drones select actions. The context is per-drone and
+            # per-round now: agent_id is fixed, n_alive_belief can change as
+            # faults happen and knowledge spreads.
+            alive_idx  = [i for i in range(n_agents) if env.agent_alive[i]]
+            ctx_before = {
+                i: ctx_to_numpy(ctx_params, ctx_norm, i, env.n_alive_belief(i))
+                for i in alive_idx
+            }
+            masks = [env._get_action_mask(i) for i in alive_idx]
 
-            actions = agent.select_actions_batch(obs, [ctx_np] * n_agents, masks)
+            acts    = agent.select_actions_batch(
+                [obs[i] for i in alive_idx],
+                [ctx_before[i] for i in alive_idx],
+                masks,
+            )
+            actions = dict(zip(alive_idx, acts))
 
             obs_before_g = [obs[i]["global"] for i in range(n_agents)]
             obs_before_l = [obs[i]["local"]  for i in range(n_agents)]
@@ -282,19 +327,38 @@ def run_phase(
                 if done:
                     break
 
-                obs_i, reward, terminated, truncated, info = env.step_agent(i, actions[i])
+                was_alive = bool(env.agent_alive[i])
+                # Dead drones still take their no-op turn (dummy action) so
+                # the global clock and step budget are unaffected by faults.
+                obs_i, reward, terminated, truncated, info = env.step_agent(
+                    i, actions.get(i, 0)
+                )
                 obs[i] = obs_i
                 done   = terminated or truncated
                 if terminated:
                     finder = i
 
-                # Context is identical before/after the step (constant within
-                # the episode), so the same ctx_np is the state and next-state ctx.
+                if not was_alive:
+                    continue  # wreck's no-op turn: nothing to learn from
+
+                if info["just_broke"]:
+                    # The drone broke before acting, so this turn produced no
+                    # transition. Close its pending n-step window as a
+                    # truncation (bootstrapped): a fault is state/action-
+                    # independent, so zeroing the future value would be biased.
+                    _consume(nstep.flush(i))
+                    continue
+
+                # n_alive_belief may have changed during the step (own
+                # detection or comm fusion), so the next-state ctx is rebuilt.
+                next_ctx = ctx_to_numpy(
+                    ctx_params, ctx_norm, i, env.n_alive_belief(i)
+                )
                 _consume(nstep.push(
                     i,
-                    obs_before_g[i], obs_before_l[i], ctx_np,
+                    obs_before_g[i], obs_before_l[i], ctx_before[i],
                     actions[i], reward,
-                    obs_i["global"], obs_i["local"], ctx_np,
+                    obs_i["global"], obs_i["local"], next_ctx,
                     terminated,
                 ))
 
@@ -306,6 +370,9 @@ def run_phase(
 
         # Episode over: optionally share the terminal reward across the team,
         # then flush each agent's pending n-step windows into the buffer.
+        # Drones that broke were flushed at fault time, so their deques are
+        # empty and apply_team_terminal skips them — the team bonus only goes
+        # to drones still operational when the target was found.
         if shared_term and finder is not None:
             nstep.apply_team_terminal(finder, target_reward)
         for i in range(n_agents):
@@ -340,6 +407,14 @@ def run_phase(
         writer.add_scalar(f"{name}/dr_vision_radius", ctx_params["vision_radius"], global_episode)
         writer.add_scalar(f"{name}/dr_comm_range",    ctx_params["comm_range"],    global_episode)
         writer.add_scalar(f"{name}/dr_n_agents",      ctx_params["n_agents"],      global_episode)
+        writer.add_scalar(f"{name}/dr_obstacle_density",
+                          ctx_params.get("obstacle_density", env.obstacle_density),
+                          global_episode)
+        writer.add_scalar(f"{name}/dr_fault_prob",
+                          ctx_params.get("fault_prob", env.fault_prob),
+                          global_episode)
+        writer.add_scalar(f"{name}/n_broken",
+                          n_agents - int(env.agent_alive.sum()), global_episode)
         writer.add_scalar("train/episode_reward",     ep_reward,            global_episode)
         writer.add_scalar("train/epsilon",            agent.epsilon,        global_episode)
         writer.add_scalar("train/lr",                 current_lr,           global_episode)

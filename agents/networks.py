@@ -41,9 +41,11 @@ import torch.nn.functional as F
 #   4  Own_Position – this drone's own cell (single 1.0). The network reads it
 #                     back (argmax) to crop the local patch, so position is a
 #                     spatial signal here rather than a context scalar.
-GLOBAL_CHANNELS = 5
+#   5  Broken       – crash sites of broken teammates known to this drone
+#                     (acquired via distress beacon / comm fusion).
+GLOBAL_CHANNELS = 6
 
-# Index of the Own_Position channel within the global map (kept last).
+# Index of the Own_Position channel within the global map.
 OWN_POSITION_CHANNEL = 4
 
 # Local patch  (B, LOCAL_CHANNELS, P, P): fine-grained detail around drone
@@ -58,9 +60,14 @@ LOCAL_CHANNELS = 5
 # Sized to cover the maximum vision_radius (6) -> field = 2*6+1 = 13.
 LOCAL_PATCH_SIZE = 13
 
-# Context vector: [vision_radius, comm_range, n_agents]. Agent position is NOT
-# here — it travels as the Own_Position global channel (see above).
-CTX_DIM = 3
+# Context vector: [vision_radius, comm_range, n_agents, agent_id,
+# n_alive_belief]. agent_id breaks the parameter-sharing symmetry (all drones
+# spawn on the same corner with identical observations — without an id the
+# shared policy cannot assign roles and split up); n_alive_belief is the team
+# size THIS drone believes is operational (its own fault knowledge, not an
+# oracle). Agent position is NOT here — it travels as the Own_Position global
+# channel (see above).
+CTX_DIM = 5
 
 
 # ---------------------------------------------------------------------------
@@ -537,7 +544,8 @@ class CnnQNetwork(nn.Module):
                 position argument is needed.
             x_local: ``(B, LOCAL_CHANNELS * gs * gs)`` flat local maps.
             ctx: ``(B, CTX_DIM)`` normalised context vector
-                ``[vision_radius, comm_range, n_agents]``.
+                ``[vision_radius, comm_range, n_agents, agent_id,
+                n_alive_belief]``.
 
         Returns:
             ``(B, n_actions)`` Q-values.

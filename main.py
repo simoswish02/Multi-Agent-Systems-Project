@@ -43,6 +43,13 @@ def parse_args():
                         help="Override comm_range for eval/play")
     parser.add_argument("--n-agents",      type=int, default=None,
                         help="Override n_agents for eval/play")
+    parser.add_argument("--fault-prob",    type=float, default=None,
+                        help="Per-step drone fault probability for eval/play/simulate "
+                             "(default: env.fault_prob from config)")
+    parser.add_argument("--auto-nav",      action="store_true",
+                        help="Eval/simulate only: once a drone knows the target, it "
+                             "follows the BFS shortest path on its known map instead "
+                             "of the network policy")
     return parser.parse_args()
 
 
@@ -88,6 +95,7 @@ def _resolve_ctx_params(config: dict, env_cfg: dict, args) -> dict:
 def run_eval(config: dict, checkpoint_path: str, args, phase_idx: int = -1):
     import torch
     from env.grid_env import DroneSearchEnv
+    from env.utils import auto_nav_action
     from training.train import ctx_to_numpy, build_ctx_norm
 
     device    = "cuda" if torch.cuda.is_available() else "cpu"
@@ -101,19 +109,23 @@ def run_eval(config: dict, checkpoint_path: str, args, phase_idx: int = -1):
     grid_size  = config["env"]["grid_size"]
     ctx_norm   = build_ctx_norm(config)
     ctx_params = _resolve_ctx_params(config, eval_cfg["env"], args)
+    fault_prob = args.fault_prob if args.fault_prob is not None \
+        else eval_cfg["env"].get("fault_prob", 0.0)
     # Apply the context to the real env so the FOV / comm range / team size the
     # network is told about match what it actually observes.
-    env.set_domain_params(**ctx_params)
+    env.set_domain_params(**ctx_params, fault_prob=fault_prob)
     print(
         f"Context: vision_radius={ctx_params['vision_radius']}  "
         f"comm_range={ctx_params['comm_range']}  "
         f"n_agents={ctx_params['n_agents']}  "
-        f"grid=fixed {grid_size}x{grid_size}"
+        f"grid=fixed {grid_size}x{grid_size}  "
+        f"fault_prob={fault_prob}  auto_nav={args.auto_nav}"
     )
 
     n_episodes = 10
     for ep in range(n_episodes):
         obs, info = env.reset()
+        env.debug_nav_paths = {}   # drone idx -> planned path (GUI overlay)
         total_r   = 0.0
         done      = False
 
@@ -122,24 +134,46 @@ def run_eval(config: dict, checkpoint_path: str, args, phase_idx: int = -1):
             for i in range(env.n_agents):
                 if done:
                     break
-                ctx_np = ctx_to_numpy(ctx_params, ctx_norm)
-                ctx_t  = torch.tensor(
-                    ctx_np, dtype=torch.float32, device=torch.device(device)
-                ).unsqueeze(0)
 
-                mask   = env._get_action_mask(i)
-                action = agent.select_action(
-                    obs[i]["global"], obs[i]["local"],
-                    ctx_t,
-                    greedy=True, action_mask=mask,
-                )
+                if not env.agent_alive[i]:
+                    # Broken drone: no-op turn, the clock still ticks.
+                    env.debug_nav_paths.pop(i, None)
+                    obs_i, r, terminated, truncated, info = env.step_agent(i, 0)
+                    obs[i] = obs_i
+                    done   = terminated or truncated
+                    continue
+
+                action = None
+                if args.auto_nav:
+                    # Deterministic homing once this drone knows the target.
+                    action, path = auto_nav_action(env, i)
+                    if action is None:
+                        env.debug_nav_paths.pop(i, None)
+                    else:
+                        env.debug_nav_paths[i] = path
+                if action is None:
+                    ctx_np = ctx_to_numpy(
+                        ctx_params, ctx_norm, i, env.n_alive_belief(i)
+                    )
+                    ctx_t  = torch.tensor(
+                        ctx_np, dtype=torch.float32, device=torch.device(device)
+                    ).unsqueeze(0)
+                    mask   = env._get_action_mask(i)
+                    action = agent.select_action(
+                        obs[i]["global"], obs[i]["local"],
+                        ctx_t,
+                        greedy=True, action_mask=mask,
+                    )
+
                 obs_i, r, terminated, truncated, info = env.step_agent(i, action)
                 obs[i]  = obs_i
                 total_r += r
                 done    = terminated or truncated
 
-        status = "FOUND" if info["found"] else "TIMEOUT"
-        print(f"Ep {ep+1:2d}: {status} | steps={info['step']:3d} | reward={total_r:.3f}")
+        status   = "FOUND" if info["found"] else "TIMEOUT"
+        n_broken = env.n_agents - int(env.agent_alive.sum())
+        print(f"Ep {ep+1:2d}: {status} | steps={info['step']:3d} | "
+              f"reward={total_r:.3f} | broken={n_broken}/{env.n_agents}")
     env.close()
 
 
@@ -162,7 +196,9 @@ def run_play(config: dict, args, phase_idx: int = -1):
     grid_size  = config["env"]["grid_size"]
     ctx_norm   = build_ctx_norm(config)
     ctx_params = _resolve_ctx_params(config, play_cfg["env"], args)
-    env.set_domain_params(**ctx_params)
+    fault_prob = args.fault_prob if args.fault_prob is not None \
+        else play_cfg["env"].get("fault_prob", 0.0)
+    env.set_domain_params(**ctx_params, fault_prob=fault_prob)
 
     obs, info = env.reset()
     env.render()
@@ -197,8 +233,10 @@ def run_play(config: dict, args, phase_idx: int = -1):
             continue
 
         # Drone 0: keyboard-controlled
+        if not env.agent_alive[0]:
+            print("[broken] Drone 0 is down — its turns are no-ops now.")
         mask0 = env._get_action_mask(0)
-        if not mask0[action0]:
+        if env.agent_alive[0] and not mask0[action0]:
             print("[blocked] That direction is a wall or OOB.")
             continue
 
@@ -241,6 +279,7 @@ def run_simulate(config: dict, args):
     import copy
     import torch
     from env.grid_env import DroneSearchEnv
+    from env.utils import auto_nav_action
     from training.train import ctx_to_numpy, build_ctx_norm
     from gui.config_screen import ConfigScreen
 
@@ -253,10 +292,18 @@ def run_simulate(config: dict, args):
         if sel is None:
             break   # setup window closed -> leave simulate mode
 
+        fault_prob = sel.get(
+            "fault_prob",
+            args.fault_prob if args.fault_prob is not None
+            else config["env"].get("fault_prob", 0.0),
+        )
+        auto_nav = sel.get("auto_nav", args.auto_nav)
+
         print(
             f"Simulate: agents={sel['n_agents']}  vision={sel['vision_radius']}  "
             f"comm={sel['comm_range']}  max_steps={sel['max_steps']}  "
-            f"episodes={sel['episodes']}  weights={sel['weights']}"
+            f"episodes={sel['episodes']}  fault_prob={fault_prob}  "
+            f"auto_nav={auto_nav}  weights={sel['weights']}"
         )
 
         cfg = copy.deepcopy(config)
@@ -273,13 +320,14 @@ def run_simulate(config: dict, args):
         env = None
         try:
             env = DroneSearchEnv(cfg, render_mode="human")
-            env.set_domain_params(**ctx_params)
+            env.set_domain_params(**ctx_params, fault_prob=fault_prob)
             agent = build_agent(config, device=device)
             agent.load(sel["weights"])
             agent.epsilon = 0.0
 
             for ep in range(sel["episodes"]):
                 obs, info = env.reset()
+                env.debug_nav_paths = {}   # drone idx -> path (GUI overlay)
                 done, total_r = False, 0.0
                 while not done:
                     env.render()
@@ -288,23 +336,47 @@ def run_simulate(config: dict, args):
                     for i in range(env.n_agents):
                         if done:
                             break
-                        ctx_np = ctx_to_numpy(ctx_params, ctx_norm)
-                        ctx_t  = torch.tensor(ctx_np, dtype=torch.float32,
-                                              device=torch.device(device)).unsqueeze(0)
-                        mask   = env._get_action_mask(i)
-                        action = agent.select_action(
-                            obs[i]["global"], obs[i]["local"], ctx_t,
-                            greedy=True, action_mask=mask,
-                        )
+
+                        if not env.agent_alive[i]:
+                            # Broken drone: no-op turn, the clock still ticks.
+                            env.debug_nav_paths.pop(i, None)
+                            obs_i, r, terminated, truncated, info = \
+                                env.step_agent(i, 0)
+                            obs[i] = obs_i
+                            done   = terminated or truncated
+                            continue
+
+                        action = None
+                        if auto_nav:
+                            action, path = auto_nav_action(env, i)
+                            if action is None:
+                                env.debug_nav_paths.pop(i, None)
+                            else:
+                                env.debug_nav_paths[i] = path
+                        if action is None:
+                            ctx_np = ctx_to_numpy(
+                                ctx_params, ctx_norm, i, env.n_alive_belief(i)
+                            )
+                            ctx_t  = torch.tensor(
+                                ctx_np, dtype=torch.float32,
+                                device=torch.device(device)
+                            ).unsqueeze(0)
+                            mask   = env._get_action_mask(i)
+                            action = agent.select_action(
+                                obs[i]["global"], obs[i]["local"], ctx_t,
+                                greedy=True, action_mask=mask,
+                            )
                         obs_i, r, terminated, truncated, info = env.step_agent(i, action)
                         obs[i]   = obs_i
                         total_r += r
                         done     = terminated or truncated
                 if getattr(env.renderer, "_closed", False):
                     break
-                status = "FOUND" if info["found"] else "TIMEOUT"
+                status   = "FOUND" if info["found"] else "TIMEOUT"
+                n_broken = env.n_agents - int(env.agent_alive.sum())
                 print(f"  Ep {ep + 1:2d}/{sel['episodes']}: {status}  "
-                      f"steps={info['step']:3d}  reward={total_r:.2f}")
+                      f"steps={info['step']:3d}  reward={total_r:.2f}  "
+                      f"broken={n_broken}/{env.n_agents}")
         except Exception as e:   # keep the setup loop alive on a bad run
             print(f"[simulate] run aborted: {e}")
         finally:

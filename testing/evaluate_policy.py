@@ -36,11 +36,19 @@ spl             Success weighted by Path Length (Anderson et al., 2018):
 collisions      mean number of same-cell overlaps entered per episode.
 revisits        mean per-agent cell re-entries per episode (redundancy).
 overlap         fraction of team-visited cells visited by more than one drone.
+n_broken        mean number of drones lost to random faults per episode.
+
+The ``fault`` axis sweeps the per-step fault probability — the key experiment
+for how the system adapts to unexpected agent loss. ``--auto-nav`` switches
+drones that know the target to the deterministic BFS shortest path on their
+known map (eval-only feature), for policy-vs-hybrid comparisons.
 
 Usage
 -----
   python testing/evaluate_policy.py --axis all --seeds 500
-  python testing/evaluate_policy.py --axis vision --seeds 1000 --checkpoint checkpoints/Phase3/best.pt
+  python testing/evaluate_policy.py --axis vision --seeds 1000 --checkpoint checkpoints/best.pt
+  python testing/evaluate_policy.py --axis fault --seeds 500
+  python testing/evaluate_policy.py --axis fault --seeds 500 --auto-nav
   python testing/evaluate_policy.py --axis epoch --seeds 300
   python testing/evaluate_policy.py --axis heatmaps --seeds 300
   python testing/evaluate_policy.py --axis density --no-ood
@@ -68,7 +76,7 @@ if _REPO_ROOT not in sys.path:
 
 # Reuse existing helpers (imported, never modified).
 from training.train import build_ctx_norm, ctx_to_numpy          # noqa: E402
-from env.utils import bfs_reachable                              # noqa: E402  (kept for parity / sanity checks)
+from env.utils import bfs_reachable, auto_nav_action             # noqa: E402
 from env.grid_env import DroneSearchEnv                          # noqa: E402
 from agents.dqn_agent import DQNAgent                            # noqa: E402
 
@@ -92,10 +100,12 @@ REFERENCE = {
     "n_agents":         3,
     "obstacle_density": 0.2,
     "max_steps":        200,
+    "fault_prob":       0.0,   # sweeps other than "fault" run fault-free
 }
 
 # kind="ctx"  → varied via set_domain_params + the context vector (in DR space)
-# kind="env"  → varied via the env config (NOT randomised during training)
+# kind="env"  → varied via the env config (density and fault_prob are also
+#               DR-randomised during training; max_steps is not)
 SWEEPS = {
     "n_agents":  {"kind": "ctx", "param": "n_agents",         "id": [1, 2, 3, 4],
                   "ood": [5, 6]},
@@ -107,6 +117,10 @@ SWEEPS = {
                   "ood": [0.35, 0.4]},
     "max_steps": {"kind": "env", "param": "max_steps",        "id": [50, 100, 150, 200, 300],
                   "ood": []},
+    # Robustness to random drone loss (the MAS-proposal experiment): id points
+    # cover the training DR range [0, 0.003]; ood pushes beyond it.
+    "fault":     {"kind": "env", "param": "fault_prob",       "id": [0.0, 0.001, 0.002, 0.003],
+                  "ood": [0.005, 0.01]},
 }
 
 # Targeted 2-D interaction grids (small, not the full product).
@@ -173,12 +187,14 @@ def make_env(base_config: dict, env_overrides: dict) -> DroneSearchEnv:
     return DroneSearchEnv(cfg, render_mode=None)
 
 
-def rollout_episode(env, agent, ctx_params, ctx_norm, grid_size, device, seed):
+def rollout_episode(env, agent, ctx_params, ctx_norm, grid_size, device, seed,
+                    auto_nav=False):
     """Run one greedy episode and return its per-episode metrics.
 
     ``ctx_params`` = {vision_radius, comm_range, n_agents}; it is applied to the
     env via ``set_domain_params`` BEFORE ``reset`` (Invariant 5) so observations
-    match the context vector handed to the network.
+    match the context vector handed to the network. With ``auto_nav`` a drone
+    that knows the target follows the BFS shortest path on its known map.
     """
     env.set_domain_params(**ctx_params)
     obs, info = env.reset(seed=seed)
@@ -196,26 +212,44 @@ def rollout_episode(env, agent, ctx_params, ctx_norm, grid_size, device, seed):
         for i in range(n_agents):
             if done:
                 break
-            ctx_np = ctx_to_numpy(ctx_params, ctx_norm)
-            ctx_t  = torch.tensor(ctx_np, dtype=torch.float32, device=device).unsqueeze(0)
-            mask   = env._get_action_mask(i)
 
-            action = agent.select_action(
-                obs[i]["global"], obs[i]["local"], ctx_t,
-                greedy=True, action_mask=mask,
-            )
+            if not env.agent_alive[i]:
+                # Broken drone: no-op turn, the clock still ticks.
+                obs_i, r, terminated, truncated, info = env.step_agent(i, 0)
+                obs[i] = obs_i
+                done   = terminated or truncated
+                continue
+
+            action = None
+            if auto_nav:
+                action, _ = auto_nav_action(env, i)
+            if action is None:
+                ctx_np = ctx_to_numpy(ctx_params, ctx_norm, i, env.n_alive_belief(i))
+                ctx_t  = torch.tensor(ctx_np, dtype=torch.float32, device=device).unsqueeze(0)
+                mask   = env._get_action_mask(i)
+
+                action = agent.select_action(
+                    obs[i]["global"], obs[i]["local"], ctx_t,
+                    greedy=True, action_mask=mask,
+                )
             obs_i, r, terminated, truncated, info = env.step_agent(i, action)
             obs[i]    = obs_i
             ep_reward += r
+            done       = terminated or truncated
+            if info["just_broke"]:
+                continue                  # broke before acting: no move made
             moves[i]  += 1
 
-            # Same-cell overlap entered on this move (mirrors env collision logic).
+            # Same-cell overlap entered on this move (mirrors env collision
+            # logic: wrecks on the ground do not collide).
             here = env.agent_pos[i]
-            collisions += sum(1 for k in range(n_agents) if k != i and env.agent_pos[k] == here)
+            collisions += sum(
+                1 for k in range(n_agents)
+                if k != i and env.agent_alive[k] and env.agent_pos[k] == here
+            )
 
             if terminated:
                 found_by = i
-            done = terminated or truncated
 
     success = bool(info["found"])
     steps   = info["step"]                                  # total agent-steps
@@ -250,6 +284,7 @@ def rollout_episode(env, agent, ctx_params, ctx_norm, grid_size, device, seed):
         "collisions":   collisions,
         "revisits":     revisits,
         "overlap":      overlap,
+        "n_broken":     env.n_agents - int(env.agent_alive.sum()),
     }
 
 
@@ -258,13 +293,14 @@ def rollout_episode(env, agent, ctx_params, ctx_norm, grid_size, device, seed):
 # ---------------------------------------------------------------------------
 
 _DETAIL_FIELDS = ["axis", "value", "in_dist", "seed", "vision", "comm", "n_agents",
-                  "density", "max_steps", "success", "reward", "steps", "coverage",
-                  "coverage_eff", "ttf", "spl", "collisions", "revisits", "overlap"]
+                  "density", "max_steps", "fault_prob", "success", "reward", "steps",
+                  "coverage", "coverage_eff", "ttf", "spl", "collisions", "revisits",
+                  "overlap", "n_broken"]
 
 _AGG_FIELDS = ["axis", "value", "in_dist", "n_seeds", "success_rate",
                "wilson_lo", "wilson_hi", "mean_reward", "std_reward",
                "coverage", "coverage_eff", "ttf", "ttf_n", "spl",
-               "collisions", "revisits", "overlap"]
+               "collisions", "revisits", "overlap", "n_broken"]
 
 
 def aggregate(axis, value, in_dist, rows):
@@ -296,6 +332,7 @@ def aggregate(axis, value, in_dist, rows):
         "collisions":   m("collisions"),
         "revisits":     m("revisits"),
         "overlap":      m("overlap"),
+        "n_broken":     m("n_broken"),
     }
 
 
@@ -318,6 +355,7 @@ def point_setup(base_config, spec, value):
         "obstacle_density": REFERENCE["obstacle_density"],
         "max_steps":        REFERENCE["max_steps"],
         "n_agents":         REFERENCE["n_agents"],
+        "fault_prob":       REFERENCE["fault_prob"],
     }
     param = spec["param"]
     if spec["kind"] == "ctx":
@@ -329,7 +367,8 @@ def point_setup(base_config, spec, value):
     return env_over, ctx
 
 
-def run_sweep(axis, base_config, agent, ctx_norm, grid_size, device, seeds, use_ood):
+def run_sweep(axis, base_config, agent, ctx_norm, grid_size, device, seeds, use_ood,
+              auto_nav=False):
     """Run one OFAT axis; return (detail_rows, agg_rows)."""
     spec   = SWEEPS[axis]
     values = list(spec["id"]) + (list(spec["ood"]) if use_ood else [])
@@ -344,19 +383,22 @@ def run_sweep(axis, base_config, agent, ctx_norm, grid_size, device, seeds, use_
         it = tqdm(seeds, desc=f"  {axis}={value!s:<6} {'(OOD)' if not in_dist else '     '}",
                   ncols=88, leave=False) if TQDM else seeds
         for seed in it:
-            m = rollout_episode(env, agent, ctx, ctx_norm, grid_size, device, seed)
+            m = rollout_episode(env, agent, ctx, ctx_norm, grid_size, device, seed,
+                                auto_nav=auto_nav)
             rows.append(m)
             detail.append({
                 "axis": axis, "value": value, "in_dist": int(in_dist), "seed": seed,
                 "vision": ctx["vision_radius"], "comm": ctx["comm_range"],
                 "n_agents": ctx["n_agents"], "density": env_over["obstacle_density"],
                 "max_steps": env_over["max_steps"],
+                "fault_prob": env_over["fault_prob"],
                 "success": m["success"], "reward": round(m["reward"], 4),
                 "steps": m["steps"], "coverage": round(m["coverage"], 5),
                 "coverage_eff": round(m["coverage_eff"], 7),
                 "ttf": m["ttf"] if m["ttf"] is not None else "",
                 "spl": round(m["spl"], 5), "collisions": m["collisions"],
                 "revisits": round(m["revisits"], 3), "overlap": round(m["overlap"], 4),
+                "n_broken": m["n_broken"],
             })
         env.close()
         a = aggregate(axis, value, in_dist, rows)
@@ -364,7 +406,7 @@ def run_sweep(axis, base_config, agent, ctx_norm, grid_size, device, seeds, use_
         print(f"  {axis:<10}={value!s:<6} {'OOD' if not in_dist else 'ID '}  "
               f"succ={a['success_rate']*100:5.1f}% [{a['wilson_lo']*100:4.1f},{a['wilson_hi']*100:4.1f}]  "
               f"R={a['mean_reward']:7.2f}  cov={a['coverage']*100:5.1f}%  "
-              f"SPL={a['spl']:.3f}  ttf={a['ttf']:6.1f}")
+              f"SPL={a['spl']:.3f}  ttf={a['ttf']:6.1f}  brk={a['n_broken']:.2f}")
     return detail, agg
 
 
@@ -395,12 +437,14 @@ def run_epoch(base_config, agent_factory, ckpt_glob, ctx_norm, grid_size, device
                 "vision": ctx["vision_radius"], "comm": ctx["comm_range"],
                 "n_agents": ctx["n_agents"], "density": env_over["obstacle_density"],
                 "max_steps": env_over["max_steps"],
+                "fault_prob": env_over["fault_prob"],
                 "success": m["success"], "reward": round(m["reward"], 4),
                 "steps": m["steps"], "coverage": round(m["coverage"], 5),
                 "coverage_eff": round(m["coverage_eff"], 7),
                 "ttf": m["ttf"] if m["ttf"] is not None else "",
                 "spl": round(m["spl"], 5), "collisions": m["collisions"],
                 "revisits": round(m["revisits"], 3), "overlap": round(m["overlap"], 4),
+                "n_broken": m["n_broken"],
             })
         env.close()
         del agent
@@ -428,7 +472,8 @@ def run_heatmaps(base_config, agent, ctx_norm, grid_size, device, seeds, out_dir
                        "n_agents":      REFERENCE["n_agents"]}
                 env_over = {"obstacle_density": REFERENCE["obstacle_density"],
                             "max_steps": REFERENCE["max_steps"],
-                            "n_agents": REFERENCE["n_agents"]}
+                            "n_agents": REFERENCE["n_agents"],
+                            "fault_prob": REFERENCE["fault_prob"]}
                 for nm, val in ((xn, xv), (yn, yv)):
                     if nm in ctx:
                         ctx[nm] = val
@@ -467,13 +512,16 @@ def _write_csv(path, fields, rows):
 def parse_args():
     p = argparse.ArgumentParser(description="OFAT sensitivity sweeps for the trained policy.")
     p.add_argument("--config",     default="configs/default.yaml")
-    p.add_argument("--checkpoint", default="checkpoints/Phase3/best.pt")
-    p.add_argument("--ckpt-glob",  default="checkpoints/Phase3/phase2_ConvNeXT_10k_dr_ep*000.pt",
+    p.add_argument("--checkpoint", default="checkpoints/best.pt")
+    p.add_argument("--ckpt-glob",  default="checkpoints/mas_10k_dr_faults_ep*000.pt",
                    help="Glob for the epoch (learning-curve) axis.")
     p.add_argument("--axis", default="all",
                    choices=["all", "n_agents", "vision", "comm", "density",
-                            "max_steps", "epoch", "heatmaps"],
-                   help="Which sweep(s) to run. 'all' = the 5 OFAT axes.")
+                            "max_steps", "fault", "epoch", "heatmaps"],
+                   help="Which sweep(s) to run. 'all' = the 6 OFAT axes.")
+    p.add_argument("--auto-nav", dest="auto_nav", action="store_true",
+                   help="Drones that know the target follow the BFS shortest "
+                        "path on their known map instead of the policy.")
     p.add_argument("--seeds",      type=int, default=500, help="Episodes per config point.")
     p.add_argument("--seed-start", type=int, default=2000, help="First seed in the bank.")
     p.add_argument("--ood", dest="ood", action="store_true",  default=True,
@@ -512,6 +560,7 @@ def main():
     print(f"  device     : {device}   grid: {grid_size}x{grid_size} (fixed)")
     print(f"  seeds      : {len(seeds)}  ({seeds[0]}..{seeds[-1]})  greedy (eps=0)")
     print(f"  OOD        : {'on' if args.ood else 'off'}")
+    print(f"  auto-nav   : {'on' if args.auto_nav else 'off'}")
     print(f"  ctx norm   : {ctx_norm}")
     print(f"  reference  : {REFERENCE}")
     print(f"  out        : {csv_dir}/\n")
@@ -539,7 +588,8 @@ def main():
     for axis in axes:
         print(f"\n--- sweep: {axis} ---")
         detail, agg = run_sweep(axis, base_config, agent, ctx_norm, grid_size,
-                                torch_device, seeds, args.ood)
+                                torch_device, seeds, args.ood,
+                                auto_nav=args.auto_nav)
         _write_csv(os.path.join(csv_dir, f"detail_{axis}.csv"), _DETAIL_FIELDS, detail)
         _write_csv(os.path.join(csv_dir, f"agg_{axis}.csv"),    _AGG_FIELDS,    agg)
         print(f"  saved: {csv_dir}/detail_{axis}.csv , agg_{axis}.csv")

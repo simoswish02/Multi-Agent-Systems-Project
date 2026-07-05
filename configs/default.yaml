@@ -17,6 +17,11 @@ env:
   #   true  -> the whole team gets target_reward on its last transition
   #            (requires agent.n_step >= 2). Toggle to A/B the two variants.
   shared_target_reward: true
+  # Per-step probability that a live drone breaks at the start of its turn
+  # and stays inactive for the rest of the episode (0 disables faults).
+  # Randomized per episode via domain_randomization during training; for
+  # eval/simulate set a fixed value here, via --fault-prob, or from the GUI.
+  fault_prob: 0.0
   seed: 42
 
 # Domain randomisation ranges (sampled uniformly each episode).
@@ -26,6 +31,12 @@ domain_randomization:
   vision_radius: [1, 6]      # normalisation denom: 6  (max)
   comm_range:    [2, 12]     # normalisation denom: 12 (max)
   n_agents:      [1, 4]      # normalisation denom: 4  (max)
+  # Environment-level DR (not context entries): obstacle density varies the
+  # world layout; fault_prob varies how often drones break. With
+  # max_steps=200 rounds, fault_prob=0.003 means ~45% chance a given drone
+  # breaks at some point in the episode ((1-0.003)^200 ≈ 0.55 survival).
+  obstacle_density: [0.10, 0.30]
+  fault_prob:       [0.0, 0.003]
 
 curriculum:
   - name: "test"
@@ -39,20 +50,7 @@ curriculum:
       comm_range:    [3, 10]
       n_agents:      [1, 3]
 
-  - name: "phase0_ConvNeXT_dr"
-    n_episodes: 0
-    n_agents: 4
-    obstacle_density: 0.20
-    max_steps: 200
-
-  - name: "phase1_ConvNeXT_continue_dr"
-    n_episodes: 0
-    n_agents: 4
-    obstacle_density: 0.20
-    max_steps: 200
-    epsilon_reset: 0.2
-
-  - name: "phase2_ConvNeXT_10k_dr"
+  - name: "mas_10k_dr_faults"
     n_episodes: 10000
     n_agents: 4
     obstacle_density: 0.20
@@ -78,7 +76,7 @@ agent:
   buffer_size: 200000
   target_update_freq: 500
 
-  fc_hidden: 1536           # FC head: combined(1024+384+3) -> 1536 -> 768 -> 384
+  fc_hidden: 1536           # FC head: combined(1024+384+5) -> 1536 -> 768 -> 384
 
 training:
   update_every: 4
@@ -87,7 +85,7 @@ training:
   eval_epsilon: 0.05
   save_every: 200
   log_dir: "runs/"
-  checkpoint_dir: "checkpoints/Phase3"
+  checkpoint_dir: "checkpoints"
 
   # Parallel evaluation during training. When true, train.py auto-spawns
   # `eval_checkpoints.py --watch` as a separate process: it evaluates every

@@ -46,7 +46,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config",    default="configs/default.yaml")
     parser.add_argument("--ckpt_dir",  default="checkpoints")
-    parser.add_argument("--pattern",   default="phase5_collision_penalty_dr_ep*.pt")
+    parser.add_argument("--pattern",   default="mas_10k_dr_faults_ep*.pt")
     parser.add_argument("--episodes",  type=int, default=100)
     parser.add_argument("--last_n",    type=int, default=None,
                         help="Evaluate only the last N checkpoints (sorted by ep).")
@@ -58,6 +58,12 @@ def parse_args():
                         help="Force eval device: 'cuda' or 'cpu' (default: auto).")
     parser.add_argument("--no_dr",     action="store_true",
                         help="Disable domain randomisation (use fixed config context).")
+    parser.add_argument("--fault_prob", type=float, default=None,
+                        help="Force a fixed per-step drone fault probability for every "
+                             "episode (overrides the DR-sampled / config value).")
+    parser.add_argument("--auto_nav",  action="store_true",
+                        help="Drones that know the target follow the BFS shortest path "
+                             "on their known map instead of the network policy.")
     # --- watch mode (parallel evaluation during training) -----------------
     parser.add_argument("--watch",     action="store_true",
                         help="Poll ckpt_dir and evaluate new checkpoints as they appear.")
@@ -91,18 +97,26 @@ def evaluate_checkpoint(
     ctx_norm:   dict,
     grid_size:  int,
     dr_cfg:     dict = None,
+    fault_prob: float = None,
+    auto_nav:   bool = False,
 ) -> dict:
     """Evaluate one checkpoint over ``seeds`` greedy episodes.
 
     When ``dr_cfg`` is given, the context {vision_radius, comm_range, n_agents}
-    is sampled deterministically from a per-seed RNG (the same mechanism as
+    (plus obstacle_density / fault_prob when their ranges are present) is
+    sampled deterministically from a per-seed RNG (the same mechanism as
     ``training.train.evaluate``): identical instances across checkpoints, varied
     across episodes. When ``dr_cfg`` is ``None`` a fixed context from the config
     is used for every episode.
+
+    ``fault_prob`` (when not None) overrides the sampled/config value with a
+    fixed per-step drone fault probability. ``auto_nav`` switches a drone that
+    knows the target to the deterministic BFS shortest path on its known map.
     """
     import random
     from agents.dqn_agent import DQNAgent
     from env.grid_env import DroneSearchEnv
+    from env.utils import auto_nav_action
     from training.train import ctx_to_numpy, sample_ctx_params
 
     n_episodes = len(seeds)
@@ -145,6 +159,7 @@ def evaluate_checkpoint(
     total_rewards = []
     found_count   = 0
     step_list     = []
+    broken_list   = []
 
     for ep in ep_iter:
         # Sample the DR context deterministically from the (fixed) seed so every
@@ -155,6 +170,9 @@ def evaluate_checkpoint(
             env.set_domain_params(**ctx_params)
         else:
             ctx_params = fixed_ctx
+        # An explicit --fault_prob overrides whatever DR/config set.
+        if fault_prob is not None:
+            env.set_domain_params(fault_prob=fault_prob)
 
         obs, info = env.reset(seed=seeds[ep])
         ep_reward = 0.0
@@ -164,28 +182,44 @@ def evaluate_checkpoint(
             for i in range(env.n_agents):
                 if done:
                     break
-                ctx_np = ctx_to_numpy(ctx_params, ctx_norm)
-                ctx_t  = torch.tensor(
-                    ctx_np, dtype=torch.float32, device=torch.device(device)
-                ).unsqueeze(0)
 
-                mask   = env._get_action_mask(i)
-                action = agent.select_action(
-                    obs[i]["global"], obs[i]["local"],
-                    ctx_t,
-                    greedy=True, action_mask=mask,
-                )
+                if not env.agent_alive[i]:
+                    # Broken drone: no-op turn, the clock still ticks.
+                    obs_i, r, terminated, truncated, info = env.step_agent(i, 0)
+                    obs[i] = obs_i
+                    done   = terminated or truncated
+                    continue
+
+                action = None
+                if auto_nav:
+                    action, _ = auto_nav_action(env, i)
+                if action is None:
+                    ctx_np = ctx_to_numpy(
+                        ctx_params, ctx_norm, i, env.n_alive_belief(i)
+                    )
+                    ctx_t  = torch.tensor(
+                        ctx_np, dtype=torch.float32, device=torch.device(device)
+                    ).unsqueeze(0)
+
+                    mask   = env._get_action_mask(i)
+                    action = agent.select_action(
+                        obs[i]["global"], obs[i]["local"],
+                        ctx_t,
+                        greedy=True, action_mask=mask,
+                    )
                 obs_i, r, terminated, truncated, info = env.step_agent(i, action)
                 obs[i]    = obs_i
                 ep_reward += r
                 done       = terminated or truncated
 
         total_rewards.append(ep_reward)
-        found = info["found"]
-        steps = info["step"]
+        found    = info["found"]
+        steps    = info["step"]
+        n_broken = env.n_agents - int(env.agent_alive.sum())
         if found:
             found_count += 1
         step_list.append(steps)
+        broken_list.append(n_broken)
 
         episode_rows.append({
             "checkpoint": ckpt_name,
@@ -197,6 +231,8 @@ def evaluate_checkpoint(
             "vision":     ctx_params["vision_radius"],
             "comm":       ctx_params["comm_range"],
             "n_agents":   ctx_params["n_agents"],
+            "fault_prob": round(float(env.fault_prob), 5),
+            "n_broken":   n_broken,
         })
 
         if TQDM_AVAILABLE:
@@ -218,6 +254,7 @@ def evaluate_checkpoint(
         "max_reward":    float(rewards_arr.max()),
         "found_rate":    found_count / n_episodes,
         "mean_steps":    float(np.mean(step_list)),
+        "mean_broken":   float(np.mean(broken_list)),
     }
 
     ep_num   = re.search(r"_ep(\d+)\.pt$", ckpt_name).group(1)
@@ -247,7 +284,8 @@ def evaluate_checkpoint(
 def save_summary_csv(results: list, out_dir: str, filename: str):
     path = os.path.join(out_dir, filename)
     fields = ["rank", "ckpt", "sum_reward", "mean_reward", "std_reward",
-              "median_reward", "min_reward", "max_reward", "found_rate", "mean_steps"]
+              "median_reward", "min_reward", "max_reward", "found_rate",
+              "mean_steps", "mean_broken"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
@@ -261,7 +299,8 @@ def save_summary_csv(results: list, out_dir: str, filename: str):
 # Incremental per-checkpoint summary written during watch mode (one row each).
 WATCH_SUMMARY = "watch_summary.csv"
 _SUMMARY_NUM_FIELDS = ("sum_reward", "mean_reward", "std_reward", "median_reward",
-                       "min_reward", "max_reward", "found_rate", "mean_steps")
+                       "min_reward", "max_reward", "found_rate", "mean_steps",
+                       "mean_broken")
 
 
 def append_watch_summary(summary: dict, out_dir: str, ep_num: int):
@@ -398,6 +437,7 @@ def watch_loop(args, config, ctx_norm, grid_size, device, dr_cfg):
                     ckpt_path=c, config=config, phase_idx=args.phase,
                     seeds=eval_seeds, device=device, out_dir=args.out_dir,
                     ctx_norm=ctx_norm, grid_size=grid_size, dr_cfg=dr_cfg,
+                    fault_prob=args.fault_prob, auto_nav=args.auto_nav,
                 )
                 append_watch_summary(summary, args.out_dir, _ckpt_ep(c))
                 evaluated.add(name)
@@ -455,15 +495,17 @@ def run_batch(args, config, ctx_norm, grid_size, device, dr_cfg):
     results = []
     for ckpt in ckpt_files:
         res = evaluate_checkpoint(
-            ckpt_path = ckpt,
-            config    = config,
-            phase_idx = args.phase,
-            seeds     = eval_seeds,
-            device    = device,
-            out_dir   = args.out_dir,
-            ctx_norm  = ctx_norm,
-            grid_size = grid_size,
-            dr_cfg    = dr_cfg,
+            ckpt_path  = ckpt,
+            config     = config,
+            phase_idx  = args.phase,
+            seeds      = eval_seeds,
+            device     = device,
+            out_dir    = args.out_dir,
+            ctx_norm   = ctx_norm,
+            grid_size  = grid_size,
+            dr_cfg     = dr_cfg,
+            fault_prob = args.fault_prob,
+            auto_nav   = args.auto_nav,
         )
         results.append(res)
 
