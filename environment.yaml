@@ -1,0 +1,21 @@
+name: rl-drone
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.24
+  - pyyaml>=6.0
+  - pytorch::pytorch>=2.0
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch::pytorch-cuda=11.8   # ← per GTX 1660 Ti (CUDA 11.x)
+  - conda-forge::pygame>=2.5
+  - pip:
+    - gymnasium>=0.29
+    - tensorboard>=2.14
+    - tqdm>=4.65
