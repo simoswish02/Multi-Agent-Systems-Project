@@ -50,10 +50,8 @@ curriculum:
       comm_range:    [3, 10]
       n_agents:      [1, 3]
 
-  - name: "mas_10k_dr_faults"
-    n_episodes: 10000
-    n_agents: 4
-    obstacle_density: 0.20
+  - name: "mas_50k_dr_faults"
+    n_episodes: 50000
     max_steps: 200
 
 agent:
@@ -71,7 +69,7 @@ agent:
   n_step: 3                # n-step returns (1 = standard one-step TD)
   epsilon_start: 1.0
   epsilon_end: 0.05
-  epsilon_decay: 0.999
+  epsilon_decay: 0.9995
   batch_size: 16
   buffer_size: 200000
   target_update_freq: 500
@@ -80,10 +78,10 @@ agent:
 
 training:
   update_every: 4
-  eval_every: 100
+  eval_every: 1000
   eval_episodes: 20
   eval_epsilon: 0.05
-  save_every: 200
+  save_every: 2500
   log_dir: "runs/"
   checkpoint_dir: "checkpoints"
 
