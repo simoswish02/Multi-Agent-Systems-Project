@@ -44,6 +44,9 @@ COLOR_TEXT     = (240, 240, 240)
 COLOR_COMM_FLASH = (255, 220, 0)
 COLOR_REWARD_POS = (80, 220, 120)
 COLOR_REWARD_NEG = (220, 80, 80)
+COLOR_BROKEN     = (110, 110, 110)   # wreck body (grayed-out drone)
+COLOR_BROKEN_X   = (230, 60, 60)     # red X over a broken drone / crash site
+COLOR_NAV_PATH   = (90, 220, 120)    # auto-nav planned path overlay
 
 # --- Chrome colours --------------------------------------------------------
 COLOR_TOOLBAR_BG    = (28, 28, 34)
@@ -64,6 +67,7 @@ COLOR_LOG_NORMAL = (180, 180, 180)
 COLOR_LOG_COMM   = (255, 220, 0)
 COLOR_LOG_TARGET = (255, 120, 40)
 COLOR_LOG_NEG    = (210, 140, 140)
+COLOR_LOG_BROKEN = (255, 90, 90)
 
 AGENT_COLORS = [
     (80, 160, 255),
@@ -232,6 +236,7 @@ class DroneRenderer:
         self._prev_visited_sum   = None
         self._prev_known         = 0
         self._prev_comm_pairs    = set()
+        self._prev_alive         = None
         self._comm_flash         = {}
         self._found_logged       = False
 
@@ -294,16 +299,25 @@ class DroneRenderer:
             return max(1, env.H * env.W)
         return max(1, int((env.grid != 1).sum()))
 
+    def _is_alive(self, i) -> bool:
+        alive = getattr(self.env, "agent_alive", None)
+        return True if alive is None else bool(alive[i])
+
     def _comm_pairs(self):
-        """Pairs of drones currently within comm range (mirrors env._communicate)."""
+        """Pairs of LIVE drones currently within comm range (mirrors
+        env._communicate — wrecks neither transmit nor receive)."""
         env = self.env
         rng = getattr(env, "comm_range", getattr(env, "comm_radius", 0))
         metric = getattr(env, "comm_metric", "manhattan")
         pairs = []
         n = env.n_agents
         for i in range(n):
+            if not self._is_alive(i):
+                continue
             ri, ci = env.agent_pos[i]
             for j in range(i + 1, n):
+                if not self._is_alive(j):
+                    continue
                 rj, cj = env.agent_pos[j]
                 if metric == "manhattan":
                     d = abs(ri - rj) + abs(ci - cj)
@@ -341,6 +355,8 @@ class DroneRenderer:
     def _snapshot(self, step):
         env = self.env
         self._prev_pos = [tuple(p) for p in env.agent_pos]
+        alive = getattr(env, "agent_alive", None)
+        self._prev_alive = None if alive is None else [bool(a) for a in alive]
         self._prev_visited_sum = [float(v.sum()) for v in env.agent_visited]
         known = self._known_count()
         self._prev_known = known
@@ -357,7 +373,21 @@ class DroneRenderer:
         env = self.env
         last_r = list(getattr(env, "last_rewards", []))
 
+        # Fault events: a drone alive at the previous frame is now down.
         for i in range(env.n_agents):
+            if not self._is_alive(i) and (
+                self._prev_alive is None
+                or (i < len(self._prev_alive) and self._prev_alive[i])
+            ):
+                self.log.add(
+                    f"[Step {step:4d}] [fault] D{i} BROKE DOWN at "
+                    f"{self._fmt_pos(env.agent_pos[i])} — inactive from now on",
+                    COLOR_LOG_BROKEN,
+                )
+
+        for i in range(env.n_agents):
+            if not self._is_alive(i):
+                continue                 # wrecks do not move: skip their rows
             cur = tuple(env.agent_pos[i])
             prev = self._prev_pos[i] if (self._prev_pos and i < len(self._prev_pos)) else cur
             nc = self._drone_new_cells(i)
@@ -398,6 +428,7 @@ class DroneRenderer:
         cr = getattr(env, "comm_range", getattr(env, "comm_radius", "N/A"))
         od = getattr(env, "obstacle_density", 0.0)
         ms = getattr(env, "max_steps", "N/A")
+        fp = getattr(env, "fault_prob", 0.0)
         rule = "=" * 34
         self.log.add_block([
             rule,
@@ -406,6 +437,7 @@ class DroneRenderer:
             f" Vision radius: {vr}",
             f" Comm radius:   {cr}",
             f" Obstacle density: {od:.2f}",
+            f" Fault prob/step:  {fp:.4f}",
             f" Max steps: {ms}",
             rule,
         ], COLOR_LOG_HEADER)
@@ -536,9 +568,15 @@ class DroneRenderer:
         self.screen.blit(self.font_big.render(status, True, scol),
                          (cx + 14, (self.TOOLBAR_H - 15) // 2))
 
-        info = f"FPS {self.FPS}   step {int(getattr(self.env, 'step_count', 0))}"
+        alive = getattr(self.env, "agent_alive", None)
+        alive_txt = ""
+        if alive is not None:
+            n_alive = int(sum(bool(a) for a in alive))
+            alive_txt = f"alive {n_alive}/{self.env.n_agents}   "
+        info = f"{alive_txt}FPS {self.FPS}   step {int(getattr(self.env, 'step_count', 0))}"
         iw = self.font_small.size(info)[0]
-        self.screen.blit(self.font_small.render(info, True, COLOR_LABEL),
+        icol = COLOR_BROKEN_X if (alive is not None and not all(alive)) else COLOR_LABEL
+        self.screen.blit(self.font_small.render(info, True, icol),
                          (w - iw - 10, (self.TOOLBAR_H - 12) // 2))
 
     def _draw_grid(self):
@@ -572,16 +610,43 @@ class DroneRenderer:
         if self.show_comm_range:
             self._draw_comm_ranges(cs, y_off)
 
+        self._draw_nav_paths(cs, y_off)
+
         for i, (r, c) in enumerate(env.agent_pos):
-            color = AGENT_COLORS[i % len(AGENT_COLORS)]
-            if self._comm_flash.get(i, 0) > 0:
+            broken = not self._is_alive(i)
+            color  = AGENT_COLORS[i % len(AGENT_COLORS)]
+            if broken:
+                color = COLOR_BROKEN
+            elif self._comm_flash.get(i, 0) > 0:
                 color = COLOR_COMM_FLASH
             cx = c * cs + cs // 2
             cy = r * cs + y_off + cs // 2
-            pygame.draw.circle(self.screen, color, (cx, cy), max(3, cs // 2 - 2))
+            rad = max(3, cs // 2 - 2)
+            pygame.draw.circle(self.screen, color, (cx, cy), rad)
             if cs >= 14:
                 label = self.font_small.render(str(i), True, (0, 0, 0))
                 self.screen.blit(label, (cx - 5, cy - 7))
+            if broken:
+                # Red X over the wreck.
+                lw = max(2, cs // 8)
+                pygame.draw.line(self.screen, COLOR_BROKEN_X,
+                                 (cx - rad, cy - rad), (cx + rad, cy + rad), lw)
+                pygame.draw.line(self.screen, COLOR_BROKEN_X,
+                                 (cx - rad, cy + rad), (cx + rad, cy - rad), lw)
+
+    def _draw_nav_paths(self, cs, y_off):
+        """Overlay the BFS auto-nav path of each homing drone (set by the
+        eval/simulate loop on env.debug_nav_paths). Drawn under the markers."""
+        paths = getattr(self.env, "debug_nav_paths", None)
+        if not paths:
+            return
+        for i, path in paths.items():
+            if not path or len(path) < 2:
+                continue
+            pts = [(c * cs + cs // 2, r * cs + y_off + cs // 2) for (r, c) in path]
+            pygame.draw.lines(self.screen, COLOR_NAV_PATH, False, pts, max(2, cs // 8))
+            # Ring around the homing drone so the mode switch is visible.
+            pygame.draw.circle(self.screen, COLOR_NAV_PATH, pts[0], max(4, cs // 2), 2)
 
     def _draw_comm_ranges(self, cs, y_off):
         """Translucent overlay of each drone's communication range — a diamond for
@@ -594,6 +659,8 @@ class DroneRenderer:
         metric = getattr(env, "comm_metric", "manhattan")
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
         for i, (r, c) in enumerate(env.agent_pos):
+            if not self._is_alive(i):
+                continue                 # wrecks have no radio
             color = AGENT_COLORS[i % len(AGENT_COLORS)]
             cx = c * cs + cs // 2
             cy = r * cs + y_off + cs // 2
@@ -712,13 +779,30 @@ class DroneRenderer:
             pygame.draw.rect(self.screen, COLOR_TARGET,
                              pygame.Rect(ox + c * csz, oy + r * csz, csz, csz))
 
+        # Crash sites this drone knows about (its own Broken map).
+        brk = getattr(env, "agent_broken", None)
+        if brk is not None:
+            for r, c in zip(*np.where(brk[i] > 0)):
+                pygame.draw.rect(self.screen, COLOR_BROKEN_X,
+                                 pygame.Rect(ox + c * csz, oy + r * csz, csz, csz))
+
+        broken = not self._is_alive(i)
         r, c = env.agent_pos[i]
-        pygame.draw.circle(self.screen, color,
+        pygame.draw.circle(self.screen, COLOR_BROKEN if broken else color,
                            (ox + c * csz + csz // 2, oy + r * csz + csz // 2), max(2, csz))
 
-        border_col = COLOR_COMM_FLASH if self._comm_flash.get(i, 0) > 0 else color
+        if broken:
+            border_col = COLOR_BROKEN_X
+        elif self._comm_flash.get(i, 0) > 0:
+            border_col = COLOR_COMM_FLASH
+        else:
+            border_col = color
         pygame.draw.rect(self.screen, border_col, cell, 2)
-        self.screen.blit(self.font_small.render(f"D{i}", True, color), (cell.x + 4, cell.y + 1))
+        tag = f"D{i} BROKEN" if broken else f"D{i}"
+        self.screen.blit(
+            self.font_small.render(tag, True, COLOR_BROKEN_X if broken else color),
+            (cell.x + 4, cell.y + 1),
+        )
 
     def _draw_charts(self, body):
         n_charts = 5

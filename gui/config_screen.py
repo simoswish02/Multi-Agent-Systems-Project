@@ -73,6 +73,59 @@ class Slider:
         pygame.draw.rect(surf, COLOR_HANDLE, self._handle_rect())
 
 
+class FloatSlider(Slider):
+    """Slider over a float range with a fixed step (e.g. fault probability).
+
+    Internally reuses the integer Slider on step indices; ``fvalue`` exposes
+    the float value.
+    """
+
+    def __init__(self, x, y, w, label, lo, hi, value, step, fmt="{:.4f}", unit=""):
+        self.flo  = lo
+        self.step = step
+        self.fmt  = fmt
+        n_steps   = int(round((hi - lo) / step))
+        idx       = int(round((min(hi, max(lo, value)) - lo) / step))
+        super().__init__(x, y, w, label, 0, n_steps, idx, unit)
+
+    @property
+    def fvalue(self) -> float:
+        return self.flo + self.value * self.step
+
+    def draw(self, surf, font):
+        surf.blit(font.render(self.label, True, COLOR_LABEL), (self.track.x, self.track.y - 22))
+        val = self.fmt.format(self.fvalue) + self.unit
+        vw = font.size(val)[0]
+        surf.blit(font.render(val, True, COLOR_TEXT), (self.track.right - vw, self.track.y - 22))
+        pygame.draw.rect(surf, COLOR_TRACK, self.track)
+        filled = pygame.Rect(self.track.x, self.track.y, self._hx() - self.track.x, self.track.h)
+        pygame.draw.rect(surf, COLOR_ACCENT, filled)
+        pygame.draw.rect(surf, COLOR_HANDLE, self._handle_rect())
+
+
+class Toggle:
+    """Clickable on/off checkbox with a label."""
+
+    def __init__(self, x, y, label, value=False):
+        self.box   = pygame.Rect(x, y, 18, 18)
+        self.hit   = pygame.Rect(x, y - 3, 420, 24)
+        self.label = label
+        self.value = bool(value)
+
+    def handle(self, ev):
+        if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1 \
+           and self.hit.collidepoint(ev.pos):
+            self.value = not self.value
+
+    def draw(self, surf, font):
+        pygame.draw.rect(surf, COLOR_FIELD, self.box)
+        pygame.draw.rect(surf, COLOR_ACCENT if self.value else COLOR_BORDER, self.box, 1)
+        if self.value:
+            pygame.draw.rect(surf, COLOR_ACCENT, self.box.inflate(-8, -8))
+        surf.blit(font.render(self.label, True, COLOR_TEXT),
+                  (self.box.right + 10, self.box.y + 1))
+
+
 class TextField:
     """Single-line editable text field (click to focus, type, backspace)."""
 
@@ -136,7 +189,7 @@ class ConfigScreen:
     normalisation the network was trained with.
     """
 
-    W, H = 560, 560
+    W, H = 560, 660
 
     def __init__(self, config: dict):
         self.config = config
@@ -145,6 +198,7 @@ class ConfigScreen:
         self.c_max = int(dr.get("comm_range", [1, 12])[1])
         self.a_max = int(dr.get("n_agents", [1, 4])[1])
         self.default_max_steps = int(config.get("env", {}).get("max_steps", 200))
+        self.default_fault     = float(config.get("env", {}).get("fault_prob", 0.0))
         self.ckpt_dir = config.get("training", {}).get("checkpoint_dir", "checkpoints/")
         self.default_weights = os.path.join(self.ckpt_dir, "best.pt")
 
@@ -167,7 +221,12 @@ class ConfigScreen:
         s_comm   = Slider(x, y, w, "Communication radius", 1, self.c_max, min(5, self.c_max)); y += gap
         s_steps  = Slider(x, y, w, "Max steps", 50, 600, self.default_max_steps); y += gap
         s_eps    = Slider(x, y, w, "Episodes to simulate", 1, 50, 10); y += gap
-        sliders = [s_agents, s_vision, s_comm, s_steps, s_eps]
+        s_fault  = FloatSlider(x, y, w, "Fault probability / step", 0.0, 0.01,
+                               self.default_fault, step=0.0005); y += gap
+        sliders = [s_agents, s_vision, s_comm, s_steps, s_eps, s_fault]
+
+        t_nav = Toggle(x, y, "Auto-nav: BFS to target once known (eval-only)")
+        y += 36
 
         wlabel_y = y + 2
         field = TextField(x, wlabel_y + 18, w - 110, 30, self.default_weights)
@@ -185,6 +244,7 @@ class ConfigScreen:
                     break
                 for s in sliders:
                     s.handle(ev)
+                t_nav.handle(ev)
                 field.handle(ev)
                 if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                     if browse_rect.collidepoint(ev.pos):
@@ -203,6 +263,8 @@ class ConfigScreen:
                                 "comm_range":    s_comm.value,
                                 "max_steps":     s_steps.value,
                                 "episodes":      s_eps.value,
+                                "fault_prob":    s_fault.fvalue,
+                                "auto_nav":      t_nav.value,
                                 "weights":       path,
                             }
                             running = False
@@ -211,6 +273,7 @@ class ConfigScreen:
             screen.blit(font_b.render("Simulation setup", True, COLOR_TEXT), (pad, 26))
             for s in sliders:
                 s.draw(screen, font)
+            t_nav.draw(screen, font)
             screen.blit(font.render("Network weights (.pt)", True, COLOR_LABEL), (x, wlabel_y))
             field.draw(screen, font)
             pygame.draw.rect(screen, COLOR_BTN, browse_rect)
