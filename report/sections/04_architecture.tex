@@ -1,0 +1,63 @@
+\section{System Architecture}
+\label{sec:architecture}
+
+% Target length: ~7 pages. Keep faithful to docs/ARCHITECTURE.md (invariants!)
+% and re-verify against code while drafting.
+% Figures: module diagram (TikZ redraw of the mermaid graph); channel table;
+% network architecture diagram; optional step_agent flowchart.
+
+\subsection{Overview and module layout}
+\label{subsec:arch-overview}
+% TODO: entry points (main.py, eval_checkpoints.py), env/, agents/, training/,
+% gui/, testing/; dependency diagram; config-driven design with
+% configs/default.yaml as single source of truth.
+
+\subsection{Environment implementation}
+\label{subsec:arch-env}
+% TODO: grid generation with BFS reachability guarantee; step_agent(i, a)
+% internals (move/validate -> reward terms -> map update -> beacon detection ->
+% communication fusion -> target check); action masking (4 move actions,
+% invalid moves masked, boxed-in safety fallback); Gymnasium-compliant
+% round-robin wrapper.
+
+\subsection{Observation encoding}
+\label{subsec:arch-obs}
+% TODO: two streams — global (6 ch x 32^2: Visited, Obstacle, Trajectory,
+% Target, Own_Position, Broken) and local (5 ch, cropped 13x13 patch, channel 4
+% = Other_Position); channel semantics table; design choice: own position as a
+% spatial channel (network recovers crop coordinates via argmax) instead of
+% out-of-band coordinates; Broken channel = per-drone fault knowledge, feeding
+% fault-awareness into the CNN spatially.
+
+\subsection{Neural architecture}
+\label{subsec:arch-network}
+% TODO: GlobalMapCNN (ConvNeXt stages 96->192->384, FiLM after each stage,
+% 8x8 token grid + CLS + ctx token -> 3-layer Transformer encoder; rationale:
+% conv+attention hybrid restores global spatial-relational reasoning);
+% LocalCNN (stride-1, dilated 7x7 depthwise, FiLM cross-conditioned on global
+% features); dueling head Q = V + A - mean(A); LayerNorm/GRN only
+% (batch-size-independent inference).
+
+\subsection{Context vector}
+\label{subsec:arch-context}
+% TODO: CTX_DIM = 5: [vision, comm, n_agents, agent_id, n_alive_belief],
+% normalized by domain-randomization maxima (build_ctx_norm); agent_id breaks
+% parameter-sharing symmetry (identical spawn observations -> role
+% differentiation at step 0); n_alive_belief enables re-planning as the
+% believed team shrinks; rebuilt every round per drone; why obstacle_density
+% and fault_prob are deliberately NOT context entries (observable from maps /
+% unknowable in reality).
+
+\subsection{Learning machinery}
+\label{subsec:arch-learning}
+% TODO: shared replay buffer; per-agent n-step windows; Double-DQN target,
+% Huber loss, gradient clipping, hard target sync; batched greedy action
+% selection (one forward pass for all live drones).
+
+\subsection{Tooling and interaction modes}
+\label{subsec:arch-tooling}
+% TODO: GUI renderer (eval/play/simulate modes, fault slider, auto-nav toggle);
+% BFS auto-nav override as an evaluation-only deterministic reference — never
+% in training (invariant).
+
+% TODO: write draft.

@@ -1,0 +1,36 @@
+\section{Background}
+\label{sec:background}
+
+% Target length: ~5 pages. Self-contained toolbox; no project details here.
+% Cite: sutton2018reinforcement, watkins1992qlearning, mnih2015human,
+% vanhasselt2016double, wang2016dueling, hessel2018rainbow, littman1994markov,
+% oliehoek2016concise, lowe2017multi, gupta2017cooperative,
+% hernandezleal2019survey, tobin2017domain, peng2018sim.
+
+\subsection{Sequential decision making}
+\label{subsec:bg-mdp}
+% TODO: MDP (S, A, P, R, gamma); policy, return, V/Q; Bellman optimality;
+% Q-learning as off-policy TD control.
+
+\subsection{Deep value-based reinforcement learning}
+\label{subsec:bg-dqn}
+% TODO: function approximation; DQN (experience replay + target network);
+% overestimation bias and Double DQN; Dueling architecture Q = V + A - mean(A);
+% n-step returns (bias/variance trade-off); truncation vs termination and why
+% time-outs must bootstrap (used later in Sec. 5.4).
+
+\subsection{Multi-agent reinforcement learning}
+\label{subsec:bg-marl}
+% TODO: Markov games generalizing MDPs; cooperative / competitive / mixed
+% settings; core challenges: non-stationarity, scalability (joint action
+% space), partial observability (Dec-POMDP flavour); solution spectrum:
+% independent learners <-> joint-action learners <-> centralized training with
+% decentralized execution (CTDE); parameter sharing as a practical middle
+% ground; credit assignment in teams.
+
+\subsection{Generalization and domain randomization}
+\label{subsec:bg-dr}
+% TODO: DR for robustness/transfer; context/task conditioning of a single
+% policy (relation to goal-/context-conditioned RL).
+
+% TODO: write draft.

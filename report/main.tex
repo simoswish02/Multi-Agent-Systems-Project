@@ -1,0 +1,92 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------------------------------------------------------------------------
+% Multi-Drone Cooperative Search with Random Faults — final report
+% Single column, 11pt. Compile with pdflatex + bibtex (or latexmk -pdf).
+% ---------------------------------------------------------------------------
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{placeins}  % \FloatBarrier keeps figures within their subsection
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{csquotes}
+\usepackage[numbers,square,sort&compress]{natbib}
+
+\usepackage[hidelinks,colorlinks=true,linkcolor=black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+
+% Figures live in report/figures/ (exported plots, diagrams, screenshots).
+\graphicspath{{figures/}}
+
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parskip}{0.35em}
+
+% Convenience macros for recurring notation.
+\newcommand{\gridsize}{32}
+\newcommand{\rvis}{r_{\mathrm{vis}}}
+\newcommand{\rcomm}{r_{\mathrm{comm}}}
+\newcommand{\pfault}{p_{\mathrm{fault}}}
+\newcommand{\nagents}{N}
+
+\title{\textbf{Multi-Drone Cooperative Search\\ with Random Faults}\\[0.4em]
+\large A fault-tolerant cooperative multi-agent system trained with\\ deep reinforcement learning, analysed through the multi-agent paradigm}
+
+\author{Simone Rimondi\\[0.3em]
+\small \href{mailto:simone.rimondi5@studio.unibo.it}{simone.rimondi5@studio.unibo.it}\\[0.3em]
+\small Multi-Agent Systems\\
+\small Master's Degree in Artificial Intelligence, University of Bologna\\
+\small Academic Year 2025/2026}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+% TODO: write last, once §1–§9 are drafted. One paragraph covering:
+% problem (cooperative target search under partial observability, limited
+% communication, step budget, and random in-mission drone faults) — approach
+% (single shared Dueling Double DQN policy, domain randomization + context
+% conditioning, decentralized fault knowledge via distress beacons) — MAS
+% reading (coordination without protocols, emergent dispersion, artefact and
+% autonomy analysis) — experimental findings (fault robustness, generalization)
+% — ethical/regulatory analysis (GDPR, EU AI Act, dual-use and autonomous
+% weapons scenario).
+Abstract placeholder.
+\end{abstract}
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_problem}
+\input{sections/04_architecture}
+\input{sections/05_training}
+\input{sections/06_mas}
+\input{sections/07_experiments}
+\input{sections/08_ethics}
+\input{sections/09_conclusions}
+
+\appendix
+\input{sections/10_appendix}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

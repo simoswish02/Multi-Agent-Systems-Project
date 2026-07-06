@@ -1,0 +1,134 @@
+\section{The System Through the Multi-Agent Paradigm}
+\label{sec:mas}
+
+% Target length: ~11 pages. THE CENTERPIECE — must be very detailed.
+% Rules: every claim grounded in a concrete system mechanism; every concept
+% cited from the original literature (Wooldridge, Jennings, Weyns, Omicini,
+% Gelernter, Grasse, Ashby, Camazine, ...) — never from course lectures.
+
+\subsection{Why a multi-agent formulation}
+\label{subsec:mas-why}
+% TODO: the three structural drivers — distribution (spatially dispersed
+% sensing, no global state), autonomy (independent decision loci), intelligence
+% (learned decision-making); why a centralized controller is inadequate here:
+% single point of failure (contradicts the fault premise), needs global state
+% (contradicts partial observability), communication-range limits, poor
+% scaling; MAS as an engineering paradigm, not just a technology.
+
+\subsection{Drones as agents}
+\label{subsec:mas-agents}
+% TODO: check each defining agent property against the implementation:
+% - computational autonomy: each drone is an encapsulated control locus;
+%   drones are never "invoked" by each other; only data crosses boundaries
+%   (map fusion);
+% - situatedness: embedded in the grid, local perception/action, action
+%   inseparable from map context;
+% - reactivity with state (Wooldridge's agents-with-state): Perception E->Per
+%   = vision update; Next I x Per -> I = accumulated maps + belief update;
+%   Action I->Ac = Q-network argmax — map the formal triple onto code paths;
+% - proactiveness: goal-directedness distilled into the value function rather
+%   than symbolically represented (teleo-reactive / goal-oriented, not
+%   goal-governed);
+% - social ability: map exchange, fault beacons.
+% Position on the weak/strong agency axis: weak agency fully satisfied; strong
+% agency (mental states, BDI) deliberately absent — the "belief" here is a
+% knowledge map, not a symbolic belief base. Honest discussion.
+
+\subsection{The environment as a first-class abstraction}
+\label{subsec:mas-environment}
+% TODO (Weyns et al.): the environment is the medium of everything — topology
+% (grid + box/Chebyshev metrics define locality of sensing and communication),
+% dynamics (the fault process lives in the environment), mediation (all
+% interaction passes through it), governance (action masking as enabler and
+% constrainer); explicit module with a contract:
+% set_domain_params -> reset -> step_agent.
+
+\subsection{Interaction and coordination}
+\label{subsec:mas-coordination}
+% TODO: taxonomy of what the drones actually do:
+% (a) direct, knowledge-level communication: range-limited map fusion =
+%     exchange of world knowledge, not commands; no ACL/protocol — contrast
+%     with speech-act-based ACLs, argue why a subsymbolic policy needs no
+%     performatives;
+% (b) shared-dataspace reading: the fused map behaves like a blackboard /
+%     tuple-space-style medium — generative-communication flavour: knowledge
+%     persists after the encounter (time uncoupling), fused maps do not record
+%     who contributed what (name uncoupling) [Gelernter];
+% (c) environment-mediated / stigmergic reading: Visited/Trajectory channels
+%     as digital traces that repel revisits — pheromone-like but virtual,
+%     carried in beliefs rather than the physical grid [Grasse, Parunak];
+% (d) learned coordination: no coordination protocol is programmed —
+%     dispersion emerges from collision penalty + exploration bonus; role
+%     allocation emerges from agent_id conditioning; coordination knowledge
+%     lives in shared network weights (implicit conventions learned by
+%     co-training).
+
+\subsection{An artefact perspective}
+\label{subsec:mas-artefacts}
+% TODO (Omicini, Ricci & Viroli — A&A): read the non-agent pieces as artefacts:
+% the accumulated/fused map = a coordination artefact (function: knowledge
+% aggregation; usage interface: read via observation, write via
+% movement+sensing; non-autonomous, reactive, inspectable); the comm channel
+% and the distress beacon as artefact-like mediators; GUI/TensorBoard as
+% observation/monitoring artefacts for the human engineer; artefacts as
+% enablers AND constrainers (trajectory-channel cap, action masking).
+
+\subsection{Self-organisation and emergence}
+\label{subsec:mas-emergence}
+% TODO: definitions (Ashby; Camazine; Goldstein), then apply: the global
+% search pattern arises from local decisions + local interactions only, no
+% external controller, no global blueprint; DESIGNED ingredients (rewards,
+% comm rule) vs EMERGENT outcomes (dispersion, division of labour, re-covering
+% a dead drone's sector); measurable emergent signatures -> coverage overlap,
+% inter-drone distance distributions (hooks for Sec. 7.6); emergence "tamed"
+% by training: the reward shapes which attractors form.
+
+\subsection{Fault tolerance, openness, and resilience}
+\label{subsec:mas-resilience}
+% TODO: team cardinality changes at runtime = a weak form of openness
+% (departures only, no joins — contrast with truly open MAS); graceful
+% degradation as a system-level property no individual drone implements;
+% EPISTEMIC reading of fault knowledge: agent_known_crashed / Broken map /
+% n_alive_belief are first-order beliefs, updated by observation (beacon) and
+% testimony (fusion) — belief propagation as gossip; beliefs can be stale or
+% wrong (a drone may act on an outdated alive count) -> decisions under
+% belief, not knowledge; robustness strategies mirrored from natural systems:
+% redundancy (any drone can find the target), decentralization (no critical
+% individual), homeostasis-like re-allocation after loss.
+
+\subsection{The autonomy spectrum}
+\label{subsec:mas-autonomy}
+% TODO: automatic vs autonomous; graduated autonomy level taxonomies from the
+% literature; this system: the human assigns the GOAL (find the target) and
+% designs the reward; the drones self-direct the HOW under unpredictability —
+% executive and interactive autonomy, but NO motivational autonomy (goals are
+% designer-given); autonomy is graduated, not binary; even "full autonomy
+% within the episode" is bounded by the designed reward — sets up the
+% accountability question -> hand-off to Sec. 8.
+
+\subsection{Learning in the multi-agent system}
+\label{subsec:mas-learning}
+% TODO: instantiate the Sec. 2.3 concepts: cooperative Markov game with
+% identical-interest reward; parameter sharing = centralized learning of a
+% decentralized-executable policy (each drone's forward pass uses only its own
+% obs+ctx -> execution fully decentralized; training pools experience -> CTDE
+% flavour); sharing mitigates non-stationarity (co-adapting agents share one
+% brain) but symmetry must be broken (agent_id); partial observability handled
+% by memory maps (accumulated obs as belief-state surrogate); credit
+% assignment: individual shaping + shared terminal bonus (n-step >= 2 caveat);
+% scalability: one policy for any team size via context conditioning, joint
+% action space never enumerated (sequential execution + independent argmax);
+% MABS view: the platform doubles as an agent-based simulation laboratory —
+% DR sweeps / OFAT = controlled what-if experiments.
+
+\subsection{What a richer multi-agent design would add}
+\label{subsec:mas-beyond}
+% TODO (honest positioning): explicit ACL protocols (sector negotiation), BDI
+% deliberation (explicit goals/plans -> explainability), organisational
+% structures (roles, formations), programmable coordination media
+% (tuple-centre-like fusion policies); trade-off: engineered coordination =
+% verifiable, explainable, but brittle and design-heavy; learned coordination
+% = adaptive, robust to randomized regimes, but opaque and hard to verify —
+% this tension recurs in Sec. 8.5.
+
+% TODO: write draft.

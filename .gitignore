@@ -231,3 +231,20 @@ __marimo__/
 /logs/
 /eval_results/
 *.pt
+
+# Course material & report planning notes (local only)
+/summaries/
+/report/planning/
+
+# LaTeX build artifacts
+report/main.pdf
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.log
+report/*.out
+report/*.toc
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/sections/*.aux

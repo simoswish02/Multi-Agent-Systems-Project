@@ -1,0 +1,52 @@
+\section{Experimental Evaluation}
+\label{sec:experiments}
+
+% Target length: ~8 pages. BLOCKED until trained weights are available.
+% Strategy: write captions and narrative structure NOW, drop in numbers and
+% figures once the final checkpoint is evaluated.
+% Tooling already in place: eval_checkpoints.py, testing/evaluate_policy.py
+% (--axis fault and other OFAT axes, --seeds, --auto-nav).
+
+\subsection{Experimental setup}
+\label{subsec:exp-setup}
+% TODO: checkpoint under test (best.pt of the final curriculum); fixed seed
+% sets; episodes per configuration (~200-500); hardware; metrics: success
+% rate, time-to-find (steps over successful episodes), coverage %, redundant
+% visit ratio / overlap, per-drone contribution; confidence intervals via
+% seed repetition.
+
+\subsection{Baselines}
+\label{subsec:exp-baselines}
+% TODO: random policy; BFS auto-nav (deterministic sweep reference — NOT an
+% upper bound, discuss why); optionally single drone vs team (value of
+% cooperation).
+
+\subsection{Generalization across randomization axes}
+\label{subsec:exp-generalization}
+% TODO: OFAT sweeps via testing/evaluate_policy.py — vision radius, comm
+% range, team size, obstacle density; one curve per axis; in-range vs
+% out-of-range probes.
+
+\subsection{Fault robustness}
+\label{subsec:exp-faults}
+% TODO (headline experiment): success/time vs fault_prob (including p=0
+% reference); behavioural adaptation: trajectories before/after a teammate's
+% crash; does a survivor re-cover the dead drone's sector?; effect of comm
+% range on how fast fault knowledge spreads (belief lag vs performance).
+
+\subsection{Ablations}
+\label{subsec:exp-ablations}
+% TODO (time permitting): no communication (comm range 0); context without
+% n_alive_belief; shared vs individual terminal reward.
+
+\subsection{Qualitative analysis}
+\label{subsec:exp-qualitative}
+% TODO: trajectory plots, visit heatmaps, dispersion snapshots; link back to
+% Sec. 6.6 emergent signatures (coverage-overlap measurements).
+
+\subsection{Discussion and limitations}
+\label{subsec:exp-discussion}
+% TODO: simulation-only; grid abstraction; i.i.d. fault model; no adversary;
+% sim-to-real gap.
+
+% TODO: run experiments once weights are ready, then draft.

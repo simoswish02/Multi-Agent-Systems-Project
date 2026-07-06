@@ -1,0 +1,80 @@
+\section{Ethical and Regulatory Analysis}
+\label{sec:ethics}
+
+% Target length: ~6 pages.
+% Scoping note to state explicitly at the top: the simulation itself processes
+% no personal data — the GDPR / AI Act analysis targets the hypothetical
+% real-world deployment of the capability the system prototypes.
+% Cite: gdpr2016, aiact2024, icrc2021position, ccw2019guiding,
+% santonidesio2018meaningful, matthias2004responsibility, sharkey2019autonomous.
+
+\subsection{A dual-use capability}
+\label{subsec:eth-dualuse}
+% TODO: identical capability, divergent deployments — search & rescue /
+% disaster response vs ISR (intelligence, surveillance, reconnaissance) and
+% target acquisition; "find a hidden target in minimum time" is
+% deployment-agnostic; why dual-use must be addressed by the designer: the
+% fault tolerance that makes rescue robust also makes an attack swarm
+% resilient to countermeasures.
+
+\subsection{Data protection: the GDPR lens}
+\label{subsec:eth-gdpr}
+% TODO: drones as mobile sensors -> personal data (images, location traces,
+% identifiability); principles: lawfulness/fairness/transparency, purpose
+% limitation (mission creep from rescue to surveillance), data minimisation
+% (the grid/occupancy abstraction as a privacy-friendly representation!),
+% storage limitation; DPIA required for systematic monitoring of publicly
+% accessible areas (Art. 35); data protection by design and by default
+% (Art. 25) — decentralized per-drone maps vs a central data lake;
+% controller/processor allocation in a decentralized swarm; law-enforcement
+% use -> LED (Directive 2016/680) rather than GDPR.
+
+\subsection{The EU AI Act}
+\label{subsec:eth-aiact}
+% TODO: risk pyramid (prohibited / high / limited / minimal); where the
+% civilian system lands: high-risk candidates via Annex III (law enforcement,
+% border management, critical-infrastructure inspection); if it searches for
+% PEOPLE -> remote biometric identification, potentially prohibited real-time
+% RBI in public spaces (Art. 5); provider obligations mapped to our pipeline:
+% risk management (Art. 9), data governance (Art. 10 — DR coverage as data
+% adequacy), technical documentation and logging (Art. 12 — TensorBoard/eval
+% traces as a seed of it), transparency (Art. 13), human oversight (Art. 14),
+% accuracy and robustness (Art. 15 — fault robustness literally is an Art. 15
+% concern); THE MILITARY CARVE-OUT: Art. 2(3) excludes defence/military uses
+% -> the war scenario escapes the AI Act entirely -> regulatory-gap
+% discussion: what governs instead.
+
+\subsection{The autonomous-weapons scenario}
+\label{subsec:eth-laws}
+% TODO: if the "target" is a military objective and detection triggers
+% engagement -> LAWS territory; governance today: IHL + CCW GGE guiding
+% principles (human responsibility non-transferable), ICRC position
+% (unpredictable weapon systems should be ruled out), meaningful human
+% control; human-in/on/out-of-the-loop mapped to the autonomy analysis of
+% Sec. 6.8; why THIS system would be unacceptable as a weapon:
+% (i) partial observability + belief staleness -> misidentification risk
+%     (IHL distinction);
+% (ii) learned opaque policy -> no case-by-case proportionality judgement;
+% (iii) emergent team behaviour -> no single decision locus (precaution;
+%      accountability gap: operator? commander? developer? — responsibility
+%      diffusion in a MAS);
+% (iv) domain-randomization generalization != verified behaviour in
+%      unanticipated conditions.
+
+\subsection{Responsibility and opacity in self-organising systems}
+\label{subsec:eth-responsibility}
+% TODO: system-level autonomy without component-level intent; deep RL policies
+% offer no plan/goal trace to audit (contrast with BDI explainability,
+% Sec. 6.10); certification problem: statistical evaluation on seeds != formal
+% guarantee; liability frameworks (product liability, PLD revision);
+% responsibility gap (Matthias).
+
+\subsection{Design recommendations}
+\label{subsec:eth-recommendations}
+% TODO (constructive close): detection-not-engagement scope; human-on-the-loop
+% confirmation for any consequential action; mission and geofencing limits;
+% tamper-proof logging for auditability; privacy-preserving sensing
+% (occupancy-level abstraction); staged deployment with monitored autonomy
+% levels.
+
+% TODO: write draft.
