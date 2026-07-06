@@ -53,6 +53,7 @@ curriculum:
   - name: "mas_50k_dr_faults"
     n_episodes: 50000
     max_steps: 200
+    n_agents: 4
 
 agent:
   lr: 0.0001
