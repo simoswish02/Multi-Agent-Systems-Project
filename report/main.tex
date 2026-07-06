@@ -14,6 +14,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage{subcaption}
@@ -30,6 +31,9 @@
 
 \captionsetup{font=small,labelfont=bf}
 \setlength{\parskip}{0.35em}
+
+% Placeholder marker for not-yet-drafted sections (remove when drafting).
+\newcommand{\draftpending}{\noindent\emph{[To be drafted.]}\par}
 
 % Convenience macros for recurring notation.
 \newcommand{\gridsize}{32}

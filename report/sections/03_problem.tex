@@ -85,12 +85,13 @@ telling them that a teammate is gone.
 \label{subsec:prob-model}
 
 We model the task as a partially observable Markov game
-\citep{littman1994markov,oliehoek2016concise} with identical-interest
+\citep{littman1994markov,oliehoek2016concise} --- the multi-agent decision
+model reviewed in Section~\ref{subsec:bg-marl} --- with identical-interest
 (cooperative) structure and \emph{sequential execution},
 \[
 \mathcal{M} \;=\; \bigl\langle \mathcal{I},\; \mathcal{S},\;
-\{\mathcal{A}_i\}_{i \in \mathcal{I}},\; T,\;
-\{\mathcal{O}_i\}_{i \in \mathcal{I}},\;
+\{\mathcal{A}_i\}_{i \in \mathcal{I}},\; P,\;
+\{\Omega_i\}_{i \in \mathcal{I}},\;
 \{r_i\}_{i \in \mathcal{I}},\; \gamma \bigr\rangle ,
 \]
 where $\mathcal{I} = \{1,\dots,\nagents\}$ is the set of drones and
@@ -125,7 +126,7 @@ architecture, where all drones are driven by a single shared network
 (Section~\ref{sec:architecture}).
 
 \paragraph{Transition.}
-The transition kernel $T$ composes a stochastic fault event with a
+The transition kernel $P$ composes a stochastic fault event with a
 deterministic move. At the start of its turn, a live acting drone $i$ breaks
 with probability $\pfault$ (its position freezes, $\beta_i \leftarrow 0$,
 permanently). Otherwise it executes its action: the move succeeds if the
@@ -187,12 +188,13 @@ occupied cell $c$; unlike the other maps it is \emph{private}
 map $\mathit{Brk}_i$ and the crashed-teammate set $\mathcal{C}_i$ record
 fault knowledge and are described in Section~\ref{subsec:prob-fault}.
 
-The observation $o_i^t \in \mathcal{O}_i$ delivered to the policy is a
+The observation $o_i^t \in \Omega_i$ delivered to the policy is a
 deterministic, multi-channel rendering of $K_i^t$ plus the drone's own
 position and the positions of \emph{live} teammates currently inside
 $V_i^t$; its exact tensor encoding is an architectural matter deferred to
 Section~\ref{subsec:arch-obs}. Conceptually, the accumulated maps play the
-role of a hand-crafted belief state: they compress the interaction history
+role of a hand-crafted belief state
+(cf.\ Section~\ref{subsec:bg-marl}): they compress the interaction history
 into a spatial summary, which is what allows a memoryless (non-recurrent)
 policy to act reasonably in a partially observable world.
 

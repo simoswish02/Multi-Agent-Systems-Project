@@ -1,5 +1,6 @@
 \section{Training Methodology}
 \label{sec:training}
+\draftpending
 
 % Target length: ~4 pages.
 % Figure: training curves (reward, success rate, epsilon/LR schedules) — after
@@ -7,6 +8,7 @@
 
 \subsection{Curriculum}
 \label{subsec:train-curriculum}
+\draftpending
 % TODO: ordered phases in config; phases override n_agents / obstacle_density /
 % max_steps / fault_prob / DR ranges; n_episodes: 0 skips a phase -> staging by
 % config edits, not code; table of the actual phase sequence used for the
@@ -14,6 +16,7 @@
 
 \subsection{Domain randomization}
 \label{subsec:train-dr}
+\draftpending
 % TODO: per-episode sampling of vision radius, comm range, team size, obstacle
 % density, fault probability (final ranges from configs/default.yaml);
 % set_domain_params before every reset (coherence between environment and
@@ -21,11 +24,13 @@
 
 \subsection{Schedules}
 \label{subsec:train-schedules}
+\draftpending
 % TODO: epsilon-greedy decay (+ per-phase epsilon_reset); LR warmup -> cosine,
 % stepped per episode; target sync frequency; replay warm-up.
 
 \subsection{Reinforcement-learning correctness decisions}
 \label{subsec:train-correctness}
+\draftpending
 % TODO (own subsection — this is a strength of the project):
 % - truncation != termination (time-outs bootstrap the next-state value);
 % - a fault is a truncation, not a terminal: fault is independent of state and
@@ -40,6 +45,7 @@
 
 \subsection{Infrastructure and reproducibility}
 \label{subsec:train-infra}
+\draftpending
 % TODO: HPC/SLURM setup (sbatch script, scratch TMPDIR); checkpointing
 % (best/last/periodic, resume semantics, replay buffer not serialized);
 % TensorBoard logging; seeding (a fixed reset seed reproduces both the layout

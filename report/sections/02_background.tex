@@ -1,36 +1,262 @@
 \section{Background}
 \label{sec:background}
 
-% Target length: ~5 pages. Self-contained toolbox; no project details here.
-% Cite: sutton2018reinforcement, watkins1992qlearning, mnih2015human,
-% vanhasselt2016double, wang2016dueling, hessel2018rainbow, littman1994markov,
-% oliehoek2016concise, lowe2017multi, gupta2017cooperative,
-% hernandezleal2019survey, tobin2017domain, peng2018sim.
+This section reviews the concepts the rest of the report relies on: the
+single-agent reinforcement-learning toolbox
+(Sections~\ref{subsec:bg-mdp}--\ref{subsec:bg-dqn}), its extension to
+multiple interacting learners (Section~\ref{subsec:bg-marl}), and the
+technique --- domain randomization with context conditioning --- that lets a
+single policy serve many task variants (Section~\ref{subsec:bg-dr}). Readers
+familiar with deep value-based reinforcement learning may skim through and
+return to individual definitions as they are referenced later; no project
+detail appears here.
 
 \subsection{Sequential decision making}
 \label{subsec:bg-mdp}
-% TODO: MDP (S, A, P, R, gamma); policy, return, V/Q; Bellman optimality;
-% Q-learning as off-policy TD control.
+
+The standard formal model of an agent acting in an environment is the
+\emph{Markov decision process} (MDP)
+\citep{sutton2018reinforcement}, a tuple
+$\langle \mathcal{S}, \mathcal{A}, P, R, \gamma \rangle$ where $\mathcal{S}$
+is a set of states, $\mathcal{A}$ a set of actions,
+$P(s' \mid s, a)$ the transition kernel, $R(s,a)$ the expected immediate
+reward, and $\gamma \in [0,1)$ a discount factor. At each step the agent
+observes the state $s_t$, picks an action $a_t \sim \pi(\cdot \mid s_t)$
+according to its \emph{policy} $\pi$, receives a reward $r_t$ and moves to
+$s_{t+1}$. The quantity being optimized is the expected \emph{return}, the
+discounted sum of future rewards
+$G_t = \sum_{k \ge 0} \gamma^k r_{t+k}$. The Markov property --- the
+distribution of $(s_{t+1}, r_t)$ depends on the history only through
+$(s_t, a_t)$ --- is what makes the problem tractable: it licenses value
+functions defined on states rather than on histories.
+
+Two value functions summarize how good states and actions are under a
+policy: the state value $V^\pi(s) = \mathbb{E}_\pi[G_t \mid s_t = s]$ and
+the action value
+$Q^\pi(s,a) = \mathbb{E}_\pi[G_t \mid s_t = s, a_t = a]$. An optimal policy
+$\pi^*$ maximizes both simultaneously, and its action-value function $Q^*$
+satisfies the Bellman optimality equation
+\[
+Q^*(s,a) \;=\; \mathbb{E}\Bigl[\, r + \gamma \max_{a'} Q^*(s', a')
+\;\Bigm|\; s, a \Bigr].
+\]
+Once $Q^*$ is known, acting optimally is trivial:
+$\pi^*(s) = \arg\max_a Q^*(s,a)$.
+
+\emph{Q-learning} \citep{watkins1992qlearning} estimates $Q^*$ from
+interaction alone, without knowledge of $P$ or $R$. After each transition
+$(s, a, r, s')$ it nudges the current estimate toward a bootstrapped target:
+\[
+Q(s,a) \;\leftarrow\; Q(s,a) + \alpha \Bigl[\, r + \gamma \max_{a'} Q(s',a')
+- Q(s,a) \Bigr],
+\]
+with step size $\alpha$. Q-learning is \emph{off-policy}: the target uses
+the greedy action $\max_{a'}$ regardless of how $a$ was chosen, so the
+experience-generating (behaviour) policy may explore freely. The standard
+behaviour policy is \emph{$\varepsilon$-greedy}: with probability
+$\varepsilon$ act uniformly at random, otherwise act greedily with respect
+to the current $Q$; annealing $\varepsilon$ over training shifts the agent
+from exploration to exploitation. In finite MDPs, tabular Q-learning
+converges to $Q^*$ under mild conditions on visitation and step sizes
+\citep{watkins1992qlearning}.
 
 \subsection{Deep value-based reinforcement learning}
 \label{subsec:bg-dqn}
-% TODO: function approximation; DQN (experience replay + target network);
-% overestimation bias and Double DQN; Dueling architecture Q = V + A - mean(A);
-% n-step returns (bias/variance trade-off); truncation vs termination and why
-% time-outs must bootstrap (used later in Sec. 5.4).
+
+Tabular methods require storing one value per state--action pair, which is
+hopeless when states are high-dimensional (in this project, stacks of
+$32\times32$ spatial maps). \emph{Function approximation} replaces the table
+with a parameterized estimator $Q_\theta(s,a)$ --- in deep reinforcement
+learning, a neural network --- trained by regression on bootstrapped
+targets. The naive combination of Q-learning with deep networks is unstable:
+consecutive samples are strongly correlated, and the regression target moves
+with every update of $\theta$, since the same network appears on both sides
+of the Bellman equation.
+
+The \emph{Deep Q-Network} (DQN) \citep{mnih2015human} stabilizes this
+combination with two mechanisms. \emph{Experience replay}
+\citep{lin1992self} stores transitions in a large circular buffer and trains
+on mini-batches sampled uniformly at random, breaking temporal correlations
+and reusing each experience many times. A separate \emph{target network}
+with frozen parameters $\theta^-$ --- periodically synchronized with the
+online parameters $\theta$ --- supplies the bootstrap value, keeping the
+regression target fixed between synchronizations. The loss for a sampled
+transition is
+\[
+\mathcal{L}(\theta) \;=\;
+\ell\bigl(\, y - Q_\theta(s,a) \,\bigr),
+\qquad
+y = r + \gamma \max_{a'} Q_{\theta^-}(s', a'),
+\]
+where $\ell$ is typically the Huber loss, which behaves quadratically near
+zero and linearly in the tails, limiting the influence of outlier targets.
+
+\paragraph{Double DQN.}
+The $\max$ operator in the target both \emph{selects} and \emph{evaluates}
+the next action with the same (noisy) estimator, which systematically
+overestimates values \citep{vanhasselt2016double}. \emph{Double DQN}
+decouples the two roles: the online network selects, the target network
+evaluates,
+\[
+y \;=\; r + \gamma\, Q_{\theta^-}\bigl(s',\,
+\arg\max_{a'} Q_{\theta}(s', a')\bigr).
+\]
+This one-line change measurably reduces overestimation bias and improves
+final policies at negligible cost.
+
+\paragraph{Dueling architecture.}
+The \emph{dueling} network \citep{wang2016dueling} decomposes the action
+value into a state value and action \emph{advantages}, computed by two heads
+on a shared representation:
+\[
+Q(s,a) \;=\; V(s) + A(s,a) - \frac{1}{|\mathcal{A}|}
+\sum_{a'} A(s,a') .
+\]
+The mean-subtraction resolves the identifiability of the decomposition
+(adding a constant to $V$ and subtracting it from all $A$ leaves $Q$
+unchanged) and, practically, lets the network learn the value of a state
+without having to learn the effect of every action in it --- useful when, in
+many states, the choice of action barely matters (e.g.\ open space far from
+anything of interest), while in a few it is critical.
+
+\paragraph{$n$-step returns.}
+One-step targets propagate reward information a single transition at a time.
+An \emph{$n$-step return} accumulates real rewards over a window of $m$
+steps before bootstrapping:
+\[
+R_t^{(m)} = \sum_{k=0}^{m-1} \gamma^k r_{t+k},
+\qquad
+y = R_t^{(m)} + \gamma^m\, Q_{\theta^-}\bigl(s_{t+m},\, \cdot\,\bigr),
+\]
+trading a little extra variance (and, off-policy, a formally uncorrected
+sampling mismatch that works well in practice
+\citep{hessel2018rainbow}) for much faster credit propagation --- a
+sensible trade in tasks with sparse terminal rewards, where a success signal
+must travel backwards across long trajectories.
+
+\paragraph{Termination vs.\ truncation.}
+A subtlety that becomes central in this project
+(Section~\ref{subsec:train-correctness}): when a window ends in a
+\emph{terminal} state, the bootstrap term is dropped
+($\gamma^m \to 0$) --- there is no future to estimate. But when an episode
+is merely \emph{truncated} (e.g.\ by an external time limit), the future
+does exist, the agent simply stops observing it; the correct target still
+bootstraps from the last state \citep{pardo2018time}. Conflating the two
+teaches the network that time-outs are value-zero events, systematically
+biasing value estimates in time-limited tasks.
 
 \subsection{Multi-agent reinforcement learning}
 \label{subsec:bg-marl}
-% TODO: Markov games generalizing MDPs; cooperative / competitive / mixed
-% settings; core challenges: non-stationarity, scalability (joint action
-% space), partial observability (Dec-POMDP flavour); solution spectrum:
-% independent learners <-> joint-action learners <-> centralized training with
-% decentralized execution (CTDE); parameter sharing as a practical middle
-% ground; credit assignment in teams.
+
+When several agents learn and act in the same environment, the MDP
+generalizes to the \emph{Markov game} (or stochastic game)
+\citep{littman1994markov}: a tuple
+$\langle \mathcal{I}, \mathcal{S}, \{\mathcal{A}_i\}, P,
+\{R_i\}, \gamma \rangle$ with agent set
+$\mathcal{I} = \{1,\dots,N\}$, where the transition kernel
+$P(s' \mid s, a_1, \dots, a_N)$ and each agent's reward
+$R_i(s, a_1, \dots, a_N)$ depend on the \emph{joint} action. Settings are
+classified by reward structure: \emph{cooperative} (identical or aligned
+interests), \emph{competitive} (zero-sum), and \emph{mixed}
+(general-sum). Cooperative teams with a common objective --- the setting of
+this project --- can in principle be treated as a single ``puppeteer''
+agent over the joint action space, but that space grows exponentially in
+$N$, and decentralized execution constraints usually forbid it anyway.
+
+If, in addition, each agent perceives only part of the state, the model
+becomes a \emph{decentralized POMDP} (Dec-POMDP)
+\citep{oliehoek2016concise}: agents receive private observations
+$o_i$ correlated with, but not determining, the state. Solving Dec-POMDPs
+optimally is NEXP-complete \citep{bernstein2002complexity} --- a complexity
+result that motivates the approximate, learning-based approaches used in
+practice.
+
+\paragraph{Non-stationarity.}
+The central pathology of multi-agent learning is that, from any single
+agent's perspective, the environment contains the \emph{other learning
+agents}: as they update their policies, the transition and reward statistics
+that agent~$i$ experiences drift, violating the stationarity assumption
+underlying single-agent convergence guarantees
+\citep{hernandezleal2019survey}. The two classical extremes span a
+trade-off. \emph{Independent learners} \citep{tan1993multi} run a
+single-agent algorithm per agent, ignoring the others: simple and scalable,
+but the drifting environment can destabilize learning and silently erase
+coordination. \emph{Joint-action learners} model the joint action space
+explicitly: coordination-aware but exponential in $N$ and dependent on
+observing others' actions.
+
+\paragraph{Centralized training, decentralized execution.}
+Most modern cooperative MARL adopts a middle path, \emph{centralized
+training with decentralized execution} (CTDE)
+\citep{kraemer2016multi,lowe2017multi}: during training --- typically in
+simulation --- global information may be pooled (shared replay data, joint
+critics, others' observations), but the artifacts that are deployed are
+per-agent policies conditioned only on locally available inputs.
+CTDE exploits the asymmetry between what is available in the laboratory and
+what is available in the field, buying training-time stability without
+sacrificing runtime decentralization.
+
+\paragraph{Parameter sharing.}
+In teams of homogeneous agents, a particularly effective CTDE instance is
+\emph{parameter sharing} \citep{gupta2017cooperative}: all agents are driven
+by a single network, trained on the pooled experience of the whole team.
+Sharing multiplies the effective sample throughput per parameter, and
+partially neutralizes non-stationarity at its source --- teammates cannot
+drift apart when they are, parametrically, the same policy. Its known
+caveat is symmetry: identically parameterized agents receiving identical
+observations produce identical behaviour, so useful role differentiation
+requires an input that distinguishes them (typically an agent index or
+identifier appended to the observation).
+
+\paragraph{Credit assignment.}
+With a shared team reward, each agent faces the question of which part of
+the outcome its own actions caused; a lazy agent can free-ride on a
+successful teammate, and naive independent updates propagate the team's
+success into everyone's values indiscriminately. Practical remedies range
+from individually shaped reward components, which keep a per-agent learning
+signal, to explicit value-decomposition schemes; the design tension is that
+individual shaping can misalign incentives with the team objective if the
+shaped terms dominate.
+
+\paragraph{Partial observability and memory.}
+Under partial observability the optimal policy generally depends on the
+observation \emph{history}, not the last observation alone; the principled
+object to condition on is a belief state
+\citep{kaelbling1998planning}. Deep approaches either learn a recurrent
+summary of the history \citep{hausknecht2015deep} or hand the agent an
+explicitly engineered memory whose content is maintained outside the
+network --- e.g.\ spatial maps accumulating everything observed so far ---
+turning the observation itself into an approximate sufficient statistic of
+the past. The latter choice trades representational generality for
+trainability and transparency, and is the one taken in this project
+(Section~\ref{subsec:prob-obs}).
 
 \subsection{Generalization and domain randomization}
 \label{subsec:bg-dr}
-% TODO: DR for robustness/transfer; context/task conditioning of a single
-% policy (relation to goal-/context-conditioned RL).
 
-% TODO: write draft.
+A policy trained in one fixed configuration tends to overfit it. When the
+deployment conditions are uncertain --- or when one wants a \emph{single}
+policy to cover a family of related tasks --- a standard remedy is
+\emph{domain randomization} (DR): sampling the parameters that define the
+task (in robotics, typically visual appearance or physical dynamics) anew
+at every training episode, so that the learner experiences a distribution
+of environments rather than a point
+\citep{tobin2017domain,peng2018sim}. A policy that performs well across the
+sampled distribution has, by construction, learned strategies robust to the
+randomized factors; with wide enough ranges, the deployment condition
+becomes ``just another sample''.
+
+Randomization can be applied blindly --- the policy never knows which
+variant it is in, and must behave robustly on average --- or with
+\emph{context conditioning}: the sampled task parameters (or the subset of
+them that a deployed agent could realistically know) are appended to the
+policy input, turning the problem into a \emph{contextual} MDP
+\citep{hallak2015contextual} and the network into a task-conditioned family
+of policies with shared weights. Conditioning lets the same parameters
+produce different behaviour in different regimes --- e.g.\ searching more
+cautiously with a short sensing range than with a long one --- rather than a
+single compromise behaviour. Which parameters to expose in the context and
+which to leave latent is a design decision: observable, actionable
+quantities help; quantities the agent could never know in reality would
+train a dependence that breaks at deployment. This report returns to that
+decision concretely in Section~\ref{subsec:arch-context}.
