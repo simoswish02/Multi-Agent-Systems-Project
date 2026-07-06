@@ -8,8 +8,7 @@ All comments and labels are in English.
 
 import pygame
 
-COLOR_BG     = (12, 12, 14)
-COLOR_BORDER = (60, 60, 66)
+from gui.theme import LOG_BG as COLOR_BG, BORDER as COLOR_BORDER
 
 
 class TerminalLog:

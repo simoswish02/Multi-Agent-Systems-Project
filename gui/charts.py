@@ -10,13 +10,15 @@ them in on every frame.
 
 import pygame
 
-COLOR_AXIS   = (95, 95, 95)
-COLOR_TITLE  = (225, 225, 225)
-COLOR_LABEL  = (140, 140, 140)
-COLOR_DASH   = (120, 120, 120)
-COLOR_PANEL  = (22, 22, 26)
-COLOR_BORDER = (55, 55, 60)
-COLOR_ZERO   = (60, 60, 60)
+from gui.theme import (
+    CHART_AXIS   as COLOR_AXIS,
+    CHART_TITLE  as COLOR_TITLE,
+    CHART_LABEL  as COLOR_LABEL,
+    CHART_DASH   as COLOR_DASH,
+    CHART_PANEL  as COLOR_PANEL,
+    CHART_BORDER as COLOR_BORDER,
+    CHART_ZERO   as COLOR_ZERO,
+)
 
 
 def _fmt(v):

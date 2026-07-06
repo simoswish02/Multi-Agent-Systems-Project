@@ -215,21 +215,28 @@ def run_play(config: dict, args, phase_idx: int = -1):
     total_r = 0.0
 
     while running:
+        # The renderer owns the single pygame event pump: it consumes its own
+        # shortcuts (pause/step/toggles) and forwards leftover KEYDOWNs
+        # (the arrows) through renderer.key_events.
+        env.render()
+        renderer = getattr(env, "renderer", None)
+        if renderer is None or renderer._closed:
+            break
+
         action0 = None
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                action0 = KEY_ACTION.get(event.key)
+        while renderer.key_events:
+            key = renderer.key_events.popleft()
+            if key in KEY_ACTION:
+                action0 = KEY_ACTION[key]
 
         if action0 is None:
+            pygame.time.wait(15)         # idle: window stays live via render()
             continue
 
         if done:
             obs, info = env.reset()
             done    = False
             total_r = 0.0
-            env.render()
             continue
 
         # Drone 0: keyboard-controlled
@@ -257,8 +264,6 @@ def run_play(config: dict, args, phase_idx: int = -1):
                 done     = terminated or truncated
                 if done:
                     break
-
-        env.render()
 
         if done:
             status = "FOUND! " if info["found"] else "Timeout"

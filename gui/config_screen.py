@@ -13,19 +13,19 @@ All UI strings are in English; comments in English.
 import os
 import pygame
 
-# Palette consistent with gui/renderer.py
-COLOR_BG       = (15, 15, 15)
-COLOR_TEXT     = (235, 235, 235)
-COLOR_LABEL    = (150, 150, 150)
-COLOR_BORDER   = (70, 70, 78)
-COLOR_ACCENT   = (90, 200, 120)
-COLOR_TRACK    = (55, 55, 64)
-COLOR_HANDLE   = (120, 200, 255)
-COLOR_BTN      = (55, 55, 64)
-COLOR_BTN_GO   = (90, 200, 120)
-COLOR_ERR      = (230, 110, 110)
-COLOR_FIELD    = (18, 18, 22)
-COLOR_FIELD_ON = (30, 30, 40)
+from gui import theme
+
+# Palette from the shared theme (single source of truth with gui/renderer.py)
+COLOR_BG       = theme.BG
+COLOR_TEXT     = theme.TEXT
+COLOR_LABEL    = theme.TEXT_DIM
+COLOR_BORDER   = theme.BORDER
+COLOR_ACCENT   = theme.ACCENT
+COLOR_TRACK    = theme.SURFACE
+COLOR_HANDLE   = theme.INFO
+COLOR_ERR      = theme.DANGER
+COLOR_FIELD    = theme.PANEL
+COLOR_FIELD_ON = theme.PANEL_ALT
 
 
 class Slider:
@@ -62,15 +62,21 @@ class Slider:
         elif ev.type == pygame.MOUSEMOTION and self.dragging:
             self._set_from_x(ev.pos[0])
 
+    def _value_text(self):
+        return f"{self.value}{self.unit}"
+
     def draw(self, surf, font):
         surf.blit(font.render(self.label, True, COLOR_LABEL), (self.track.x, self.track.y - 22))
-        val = f"{self.value}{self.unit}"
+        val = self._value_text()
         vw = font.size(val)[0]
         surf.blit(font.render(val, True, COLOR_TEXT), (self.track.right - vw, self.track.y - 22))
-        pygame.draw.rect(surf, COLOR_TRACK, self.track)
+        pygame.draw.rect(surf, COLOR_TRACK, self.track, border_radius=3)
         filled = pygame.Rect(self.track.x, self.track.y, self._hx() - self.track.x, self.track.h)
-        pygame.draw.rect(surf, COLOR_ACCENT, filled)
-        pygame.draw.rect(surf, COLOR_HANDLE, self._handle_rect())
+        pygame.draw.rect(surf, COLOR_ACCENT, filled, border_radius=3)
+        handle = self._handle_rect()
+        hover = self.dragging or handle.inflate(8, 8).collidepoint(theme.mouse_pos())
+        pygame.draw.rect(surf, theme.brighten(COLOR_HANDLE, 30) if hover else COLOR_HANDLE,
+                         handle, border_radius=6)
 
 
 class FloatSlider(Slider):
@@ -92,15 +98,8 @@ class FloatSlider(Slider):
     def fvalue(self) -> float:
         return self.flo + self.value * self.step
 
-    def draw(self, surf, font):
-        surf.blit(font.render(self.label, True, COLOR_LABEL), (self.track.x, self.track.y - 22))
-        val = self.fmt.format(self.fvalue) + self.unit
-        vw = font.size(val)[0]
-        surf.blit(font.render(val, True, COLOR_TEXT), (self.track.right - vw, self.track.y - 22))
-        pygame.draw.rect(surf, COLOR_TRACK, self.track)
-        filled = pygame.Rect(self.track.x, self.track.y, self._hx() - self.track.x, self.track.h)
-        pygame.draw.rect(surf, COLOR_ACCENT, filled)
-        pygame.draw.rect(surf, COLOR_HANDLE, self._handle_rect())
+    def _value_text(self):
+        return self.fmt.format(self.fvalue) + self.unit
 
 
 class Toggle:
@@ -118,10 +117,14 @@ class Toggle:
             self.value = not self.value
 
     def draw(self, surf, font):
-        pygame.draw.rect(surf, COLOR_FIELD, self.box)
-        pygame.draw.rect(surf, COLOR_ACCENT if self.value else COLOR_BORDER, self.box, 1)
+        hover = self.hit.collidepoint(theme.mouse_pos())
+        pygame.draw.rect(surf, COLOR_FIELD, self.box, border_radius=4)
+        border = COLOR_ACCENT if self.value else (
+            theme.brighten(COLOR_BORDER, 24) if hover else COLOR_BORDER)
+        pygame.draw.rect(surf, border, self.box, 1, border_radius=4)
         if self.value:
-            pygame.draw.rect(surf, COLOR_ACCENT, self.box.inflate(-8, -8))
+            pygame.draw.rect(surf, COLOR_ACCENT, self.box.inflate(-8, -8),
+                             border_radius=2)
         surf.blit(font.render(self.label, True, COLOR_TEXT),
                   (self.box.right + 10, self.box.y + 1))
 
@@ -146,8 +149,10 @@ class TextField:
                 self.text += ev.unicode
 
     def draw(self, surf, font):
-        pygame.draw.rect(surf, COLOR_FIELD_ON if self.focused else COLOR_FIELD, self.rect)
-        pygame.draw.rect(surf, COLOR_ACCENT if self.focused else COLOR_BORDER, self.rect, 1)
+        pygame.draw.rect(surf, COLOR_FIELD_ON if self.focused else COLOR_FIELD,
+                         self.rect, border_radius=5)
+        pygame.draw.rect(surf, COLOR_ACCENT if self.focused else COLOR_BORDER,
+                         self.rect, 1, border_radius=5)
         # Right-align the visible tail so the end of long paths stays readable.
         max_w = self.rect.w - 12
         txt = self.text
@@ -207,9 +212,9 @@ class ConfigScreen:
         screen = pygame.display.set_mode((self.W, self.H))
         pygame.display.set_caption("Simulation setup - Multi-Drone Search")
         clock = pygame.time.Clock()
-        font   = pygame.font.SysFont("monospace", 14)
-        font_b = pygame.font.SysFont("monospace", 18, bold=True)
-        font_s = pygame.font.SysFont("monospace", 12)
+        font   = theme.font(14)
+        font_b = theme.font(19, bold=True)
+        font_s = theme.font(12)
 
         pad = 28
         x = pad
@@ -276,24 +281,15 @@ class ConfigScreen:
             t_nav.draw(screen, font)
             screen.blit(font.render("Network weights (.pt)", True, COLOR_LABEL), (x, wlabel_y))
             field.draw(screen, font)
-            pygame.draw.rect(screen, COLOR_BTN, browse_rect)
-            pygame.draw.rect(screen, COLOR_BORDER, browse_rect, 1)
-            blbl = "Browse..."
-            bw = font.size(blbl)[0]
-            screen.blit(font.render(blbl, True, COLOR_TEXT),
-                        (browse_rect.centerx - bw // 2, browse_rect.y + 8))
+            theme.draw_button(screen, browse_rect, "Browse...", font)
 
             screen.blit(font_s.render("Spawn is forced to the top-left corner (0,0).",
                                       True, COLOR_LABEL), (x, start_rect.y - 26))
             if error:
                 screen.blit(font_s.render(error, True, COLOR_ERR), (x, start_rect.y - 44))
 
-            pygame.draw.rect(screen, COLOR_BTN_GO, start_rect)
-            pygame.draw.rect(screen, COLOR_BORDER, start_rect, 1)
-            slbl = "Start simulation"
-            sw = font_b.size(slbl)[0]
-            screen.blit(font_b.render(slbl, True, (15, 25, 18)),
-                        (start_rect.centerx - sw // 2, start_rect.y + 8))
+            theme.draw_button(screen, start_rect, "Start simulation", font_b,
+                              active=True, radius=8)
 
             pygame.display.flip()
             clock.tick(60)

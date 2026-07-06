@@ -21,64 +21,36 @@ eval loop). See docs/REFACTOR_REPORT.md ("GUI — What changed").
 All UI strings are in English. Comments are in English.
 """
 
+import math
+from collections import deque
+
 import numpy as np
 
 try:
     import pygame
     from gui import charts
+    from gui import effects
+    from gui import icons
     from gui import terminal as terminal_widget
+    from gui import theme
+    from gui.theme import (
+        COLOR_UNKNOWN, COLOR_FREE, COLOR_OBSTACLE, COLOR_TARGET,
+        COLOR_GRID_LINE, COLOR_BG, COLOR_TEXT, COLOR_COMM_FLASH,
+        COLOR_REWARD_POS, COLOR_REWARD_NEG, COLOR_BROKEN, COLOR_BROKEN_X,
+        COLOR_NAV_PATH,
+        COLOR_TOOLBAR_BG, COLOR_SIDEBAR_BG, COLOR_BORDER, COLOR_SECTION_HDR,
+        COLOR_BTN, COLOR_BTN_ACTIVE, COLOR_BTN_DISABLED, COLOR_PLAYING,
+        COLOR_PAUSED, COLOR_INACTIVE_PANEL, COLOR_LABEL,
+        COLOR_LOG_HEADER, COLOR_LOG_NORMAL, COLOR_LOG_COMM, COLOR_LOG_TARGET,
+        COLOR_LOG_NEG, COLOR_LOG_BROKEN, AGENT_COLORS,
+    )
     PYGAME_AVAILABLE = True
 except ImportError:                      # pragma: no cover - exercised only without pygame
     PYGAME_AVAILABLE = False
     charts = None
     terminal_widget = None
 
-# --- Map colours -----------------------------------------------------------
-COLOR_UNKNOWN  = (30, 30, 30)
-COLOR_FREE     = (200, 200, 200)
-COLOR_OBSTACLE = (60, 60, 60)
-COLOR_TARGET   = (255, 80, 80)
-COLOR_GRID_LINE = (100, 100, 100)
-COLOR_BG       = (15, 15, 15)
-COLOR_TEXT     = (240, 240, 240)
-COLOR_COMM_FLASH = (255, 220, 0)
-COLOR_REWARD_POS = (80, 220, 120)
-COLOR_REWARD_NEG = (220, 80, 80)
-COLOR_BROKEN     = (110, 110, 110)   # wreck body (grayed-out drone)
-COLOR_BROKEN_X   = (230, 60, 60)     # red X over a broken drone / crash site
-COLOR_NAV_PATH   = (90, 220, 120)    # auto-nav planned path overlay
-
-# --- Chrome colours --------------------------------------------------------
-COLOR_TOOLBAR_BG    = (28, 28, 34)
-COLOR_SIDEBAR_BG    = (18, 18, 22)
-COLOR_BORDER        = (60, 60, 66)
-COLOR_SECTION_HDR   = (40, 40, 48)
-COLOR_BTN           = (55, 55, 64)
-COLOR_BTN_ACTIVE    = (90, 200, 120)
-COLOR_BTN_DISABLED  = (38, 38, 42)
-COLOR_PLAYING       = (90, 220, 120)
-COLOR_PAUSED        = (240, 190, 60)
-COLOR_INACTIVE_PANEL = (34, 34, 38)
-COLOR_LABEL         = (140, 140, 140)
-
-# --- Episode-log line colours ---------------------------------------------
-COLOR_LOG_HEADER = (240, 240, 240)
-COLOR_LOG_NORMAL = (180, 180, 180)
-COLOR_LOG_COMM   = (255, 220, 0)
-COLOR_LOG_TARGET = (255, 120, 40)
-COLOR_LOG_NEG    = (210, 140, 140)
-COLOR_LOG_BROKEN = (255, 90, 90)
-
-AGENT_COLORS = [
-    (80, 160, 255),
-    (80, 255, 160),
-    (255, 160, 80),
-    (200, 80, 255),
-    (255, 80, 200),
-]
-
 _SCREEN_MARGIN = 80
-COMM_FLASH_FRAMES = 4
 MINIMAP_SLOTS = 4
 
 
@@ -96,7 +68,10 @@ class DroneRenderer:
     """
 
     CELL_DEFAULT = 22
-    FPS = 10
+    FPS = 10                       # stepped-mode frames (= env rounds) per second
+    FPS_SMOOTH = 60                # sub-loop frame rate in smooth mode
+    ROUND_MS = 100                 # smooth glide duration per round at speed 1.0x
+    SPEED_STEPS = (0.5, 1.0, 2.0, 4.0)
 
     SIDEBAR_W    = 500
     TOOLBAR_H    = 44
@@ -117,13 +92,32 @@ class DroneRenderer:
         self.playing = True            # default state on open
         self.step_pending = False
         self.show_comm_range = False   # toggle: overlay each drone's comm range
+        self.smooth = False            # toggle (M): glide between cells vs stepped
+        self.show_trails = True        # toggle (T): fading recent-position trails
+        self.show_legend = False       # toggle (L): symbol legend overlay
+        self.speed_idx = 1             # index into SPEED_STEPS (1.0x)
+
+        # Unconsumed KEYDOWNs forwarded to external loops (e.g. play mode).
+        self.key_events = deque(maxlen=8)
+
+        # Cached terrain layer (rebuilt per round, blitted per frame) and a
+        # reusable full-window SRCALPHA overlay for translucent drawing.
+        self._terrain_surf = None
+        self._terrain_dirty = True
+        self._overlay = None
+
+        # Drawn (possibly tweened) agent positions in float grid coords.
+        self._display_pos = None
+        self._heading = []
+        self._teleport = False         # set on episode boundaries: snap, no glide
 
         # Collapsible sidebar sections (all expanded by default)
         self.sections = {"minimaps": True, "charts": True, "log": True}
 
         # Widgets / per-frame UI bookkeeping
         self.log = terminal_widget.TerminalLog()
-        self._comm_flash = {}
+        self.fx = effects.EffectManager()
+        self._comm_flash_until = {}    # drone idx -> ms deadline (minimap border)
         self._buttons = {}
         self._section_headers = {}
         self._log_rect = None
@@ -170,18 +164,37 @@ class DroneRenderer:
             self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 
         self.clock = pygame.time.Clock()
-        self.font_big   = pygame.font.SysFont("monospace", 15, bold=True)
-        self.font_small = pygame.font.SysFont("monospace", 12)
-        self.font_mono  = pygame.font.SysFont("monospace", 12)
-        self.font_tiny  = pygame.font.SysFont("monospace", 10)
-        self.log.line_h = 14
+        self.font_big   = theme.font(15, bold=True)
+        self.font_small = theme.font(12)
+        self.font_mono  = theme.font(12, mono=True)
+        self.font_tiny  = theme.font(10, mono=True)
+        self.log.line_h = self.font_mono.get_height() + 2
+
+        # Cell size may have changed: rebuild size-dependent caches.
+        icons.clear_cache()
+        self._terrain_surf = None
+        self._overlay = None
+
+    @property
+    def speed(self) -> float:
+        return self.SPEED_STEPS[self.speed_idx]
+
+    def _now(self) -> int:
+        """Animation clock in milliseconds. Headless frames derive it from
+        step_count so rgb_array output stays deterministic."""
+        if self.headless:
+            return int(getattr(self.env, "step_count", 0)) * 100
+        return pygame.time.get_ticks()
 
     # ------------------------------------------------------------------
     # Public per-frame entry points
     # ------------------------------------------------------------------
 
     def render(self):
-        """Draw one human-mode frame. Blocks while PAUSED until Play / Step."""
+        """Draw one round's worth of frames. Blocks while PAUSED until Play /
+        Step. In smooth mode a short 60 FPS sub-loop glides the drones from
+        their previous to their current cells; one render() call still gates
+        exactly one caller round."""
         if self.headless or self._closed:
             return
         self._tick_data()
@@ -189,29 +202,71 @@ class DroneRenderer:
         if self._closed:
             return
 
-        # Pause gate: keep the window alive without advancing the simulation.
+        targets = [(float(r), float(c)) for r, c in self.env.agent_pos]
+        prev = self._display_pos
+        can_glide = (
+            self.smooth and self.playing and not self._teleport
+            and prev is not None and len(prev) == len(targets)
+            and 0.0 < self._max_jump(prev, targets) <= 2.0
+        )
+        self._teleport = False
+        if can_glide:
+            self._animate_round(targets)
+        else:
+            self._display_pos = targets
+            self._draw_flip()
+            self.clock.tick(self.FPS * self.speed)
+        if self._closed:
+            return
+
+        if not self.playing:
+            self._pause_gate()
+
+    def _draw_flip(self):
+        self._draw()
+        pygame.display.flip()
+
+    def _pause_gate(self):
+        """Keep the window alive without advancing the simulation; a single
+        Step breaks out so the caller advances exactly one round."""
         while not self.playing and not self._closed:
-            self._draw()
-            self._decay_flash()
-            pygame.display.flip()
+            self._draw_flip()
             self.clock.tick(self.FPS)
             self._handle_events()
             if self.step_pending:        # single-step requested -> let caller advance once
                 self.step_pending = False
                 break
-        if self._closed:
-            return
 
-        self._draw()
-        self._decay_flash()
-        pygame.display.flip()
-        self.clock.tick(self.FPS)
+    @staticmethod
+    def _max_jump(a, b):
+        """Largest per-drone Manhattan distance between two position lists."""
+        return max((abs(ar - br) + abs(ac - bc)
+                    for (ar, ac), (br, bc) in zip(a, b)), default=0.0)
+
+    def _animate_round(self, targets):
+        """Smooth-mode sub-loop: tween _display_pos toward `targets` over
+        ROUND_MS/speed. Pausing mid-glide finishes the move instantly (paused
+        positions always reflect the true env state), then render() gates."""
+        start = list(self._display_pos)
+        period = max(1.0, self.ROUND_MS / self.speed)
+        t0 = pygame.time.get_ticks()
+        while not self._closed:
+            t = (pygame.time.get_ticks() - t0) / period
+            te = effects.ease_smoothstep(t)
+            self._display_pos = [effects.lerp_pos(a, b, te)
+                                 for a, b in zip(start, targets)]
+            self._draw_flip()
+            self.clock.tick(self.FPS_SMOOTH)
+            self._handle_events()
+            if t >= 1.0 or not self.playing:
+                break
+        self._display_pos = targets
 
     def get_rgb_array(self):
         """Render to the offscreen surface and return an (H, W, 3) array."""
         self._tick_data()
+        self._display_pos = None         # headless: always draw true positions
         self._draw()
-        self._decay_flash()
         return np.transpose(np.array(pygame.surfarray.array3d(self.screen)), axes=(1, 0, 2))
 
     def close(self):
@@ -237,8 +292,17 @@ class DroneRenderer:
         self._prev_known         = 0
         self._prev_comm_pairs    = set()
         self._prev_alive         = None
-        self._comm_flash         = {}
+        self._comm_flash_until   = {}
         self._found_logged       = False
+
+        self._display_pos        = None
+        self._heading            = [None] * n
+        self._terrain_dirty      = True
+        self._trails             = [deque(maxlen=10) for _ in range(n)]
+        self._active_pairs       = []
+        self._prev_merged_mask   = None
+        self._target_discovered  = False
+        self.fx.clear()
 
         self._last_total = 0.0
         self._last_cov   = 0.0
@@ -259,8 +323,10 @@ class DroneRenderer:
             self._log_episode_start()
             self._episode_active = True
             self._episode_ended = False
+            self._teleport = True        # never glide across an episode boundary
             self._snapshot(step)
             self._record_sample(step)
+            self._on_world_changed(spawn_effects=False)
             self._prev_step = step
             return
 
@@ -270,11 +336,55 @@ class DroneRenderer:
         # One or more rounds happened since the last frame.
         self._log_round(step)
         self._record_sample(step)
+        self._update_headings()
+        self._update_trails()
+        self._on_world_changed()
         if getattr(env, "done", False) and not self._episode_ended:
             self._log_episode_end()
             self._episode_ended = True
         self._snapshot(step)
         self._prev_step = step
+
+    def _on_world_changed(self, spawn_effects: bool = True):
+        """Round bookkeeping for the drawing layer: terrain refresh, comm-pair
+        cache, fog fade-in spawns and target-discovery detection."""
+        env = self.env
+        now = self._now()
+        self._terrain_dirty = True
+        self._active_pairs = self._comm_pairs()
+
+        mask = self._merged_maps()[0] > 0
+        if spawn_effects and self._prev_merged_mask is not None:
+            new = np.argwhere(mask & ~self._prev_merged_mask)
+            if len(new) <= 220:          # no fireworks on giant one-round reveals
+                for r, c in new:
+                    self.fx.spawn(effects.CellFade(now, (int(r), int(c))))
+        self._prev_merged_mask = mask
+
+        # Latched team-level discovery: any 1.0 in any drone's target map.
+        tgt = getattr(env, "agent_target", None)
+        if tgt is not None and not self._target_discovered and np.any(tgt > 0):
+            self._target_discovered = True
+            if spawn_effects:
+                self.fx.spawn(effects.DiscoveryFlash(now, tuple(env.target_pos)))
+                self.log.add(
+                    f"[Step {int(getattr(env, 'step_count', 0)):4d}] [target] "
+                    f"target spotted — position now known to the team",
+                    COLOR_LOG_TARGET,
+                )
+
+    def _update_trails(self):
+        env = self.env
+        if len(self._trails) != env.n_agents:
+            self._trails = [deque(maxlen=10) for _ in range(env.n_agents)]
+        for i in range(env.n_agents):
+            if not self._is_alive(i):
+                continue                 # wrecks stop leaving a trail
+            cur = tuple(env.agent_pos[i])
+            prev = (self._prev_pos[i]
+                    if (self._prev_pos and i < len(self._prev_pos)) else None)
+            if cur != prev:
+                self._trails[i].append(cur)
 
     # ------------------------------------------------------------------
     # Derived quantities
@@ -333,6 +443,20 @@ class DroneRenderer:
             return 0
         return max(0, int(round(cur - self._prev_visited_sum[i])))
 
+    def _update_headings(self):
+        """Remember each live drone's last move direction (grid delta)."""
+        env = self.env
+        n = env.n_agents
+        if len(self._heading) != n:
+            self._heading = [None] * n
+        if not self._prev_pos:
+            return
+        for i in range(min(n, len(self._prev_pos))):
+            pr, pc = self._prev_pos[i]
+            cr, cc = env.agent_pos[i]
+            if (cr, cc) != (pr, pc):
+                self._heading[i] = (cr - pr, cc - pc)
+
     # ------------------------------------------------------------------
     # History recording + logging
     # ------------------------------------------------------------------
@@ -384,6 +508,9 @@ class DroneRenderer:
                     f"{self._fmt_pos(env.agent_pos[i])} — inactive from now on",
                     COLOR_LOG_BROKEN,
                 )
+                # One-shot red flash at the crash site.
+                self.fx.spawn(effects.CommRipple(
+                    self._now(), tuple(env.agent_pos[i]), theme.DANGER))
 
         for i in range(env.n_agents):
             if not self._is_alive(i):
@@ -399,15 +526,21 @@ class DroneRenderer:
 
         # Communication: log only newly-formed pairs to avoid per-step spam.
         pairs = self._comm_pairs()
+        now = self._now()
         for (i, j, d) in pairs:
             if (i, j) not in self._prev_comm_pairs:
                 self.log.add(
                     f"[Step {step:4d}] [comm] D{i} <-> D{j} communicated  (distance={d:.1f})",
                     COLOR_LOG_COMM,
                 )
+                # Radio ripples at both endpoints when the link forms.
+                self.fx.spawn(effects.CommRipple(
+                    now, tuple(env.agent_pos[i]), AGENT_COLORS[i % len(AGENT_COLORS)]))
+                self.fx.spawn(effects.CommRipple(
+                    now, tuple(env.agent_pos[j]), AGENT_COLORS[j % len(AGENT_COLORS)]))
         for (i, j, _d) in pairs:
-            self._comm_flash[i] = COMM_FLASH_FRAMES
-            self._comm_flash[j] = COMM_FLASH_FRAMES
+            self._comm_flash_until[i] = now + 400
+            self._comm_flash_until[j] = now + 400
 
         # Target found (best-effort: the env's terminal round may not be rendered
         # in the eval loop; see module docstring).
@@ -465,10 +598,25 @@ class DroneRenderer:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     self.playing = not self.playing
+                    if self.playing:
+                        self.step_pending = False   # drop a stale queued step
                 elif event.key == pygame.K_RIGHT and not self.playing:
                     self.step_pending = True
                 elif event.key == pygame.K_c:
                     self.show_comm_range = not self.show_comm_range
+                elif event.key == pygame.K_m:
+                    self.smooth = not self.smooth
+                elif event.key == pygame.K_t:
+                    self.show_trails = not self.show_trails
+                elif event.key == pygame.K_l:
+                    self.show_legend = not self.show_legend
+                elif event.key in (pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS):
+                    self.speed_idx = min(len(self.SPEED_STEPS) - 1, self.speed_idx + 1)
+                elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+                    self.speed_idx = max(0, self.speed_idx - 1)
+                else:
+                    # Not ours: forward to the embedding loop (play mode arrows).
+                    self.key_events.append(event.key)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self._on_click(event.pos)
@@ -484,12 +632,23 @@ class DroneRenderer:
             if rect.collidepoint(pos):
                 if key == "play":
                     self.playing = True
+                    self.step_pending = False       # drop a stale queued step
                 elif key == "pause":
                     self.playing = False
                 elif key == "step" and not self.playing:
                     self.step_pending = True
                 elif key == "comm":
                     self.show_comm_range = not self.show_comm_range
+                elif key == "smooth":
+                    self.smooth = not self.smooth
+                elif key == "trails":
+                    self.show_trails = not self.show_trails
+                elif key == "legend":
+                    self.show_legend = not self.show_legend
+                elif key == "speed_down":
+                    self.speed_idx = max(0, self.speed_idx - 1)
+                elif key == "speed_up":
+                    self.speed_idx = min(len(self.SPEED_STEPS) - 1, self.speed_idx + 1)
                 return
         for key, rect in self._section_headers.items():
             if rect.collidepoint(pos):
@@ -508,11 +667,10 @@ class DroneRenderer:
         self.screen = pygame.display.set_mode(
             (max(w, self.SIDEBAR_W + 120), max(h, 320)), pygame.RESIZABLE
         )
-
-    def _decay_flash(self):
-        for k in list(self._comm_flash.keys()):
-            if self._comm_flash[k] > 0:
-                self._comm_flash[k] -= 1
+        # Cell size changed: rebuild size-dependent caches.
+        icons.clear_cache()
+        self._terrain_surf = None
+        self._overlay = None
 
     # ------------------------------------------------------------------
     # Drawing
@@ -523,116 +681,413 @@ class DroneRenderer:
         self._draw_toolbar()
         self._draw_grid()
         self._draw_sidebar()
+        if self.show_legend:
+            self._draw_legend()
+
+    def _draw_legend(self):
+        """Symbol legend overlay (toggle L), anchored top-right of the grid.
+        Glyphs come from the same icon factory as the live view."""
+        rows = [
+            ("drone",    "Drone (numbered, rotors spin)"),
+            ("wreck",    "Wreck — broken drone"),
+            ("distress", "Distress beacon (until all know)"),
+            ("link",     "Comm link (within range)"),
+            ("ripple",   "Comm ripple (new contact)"),
+            ("ghost",    "Target — not yet discovered"),
+            ("beacon",   "Target — discovered"),
+            ("nav",      "Auto-nav BFS path"),
+            ("trail",    "Trail (recent cells)"),
+            ("fog",      "Fog / explored cell"),
+        ]
+        gs = 18                          # glyph box size
+        row_h, pad = 24, 10
+        width = 252
+        height = pad * 2 + 20 + row_h * len(rows)
+        gw = self.env.W * self.CELL
+        panel = pygame.Rect(max(4, gw - width - 8), self.TOOLBAR_H + 8,
+                            width, height)
+        theme.draw_panel(self.screen, panel, alpha=232)
+        t = self.font_small.render("Legend", True, COLOR_TEXT)
+        self.screen.blit(t, (panel.x + pad, panel.y + 5))
+        now = self._now()
+        y = panel.y + pad + 20
+        for kind, label in rows:
+            self._draw_legend_glyph(kind, panel.x + pad + gs // 2,
+                                    y + row_h // 2, gs, now)
+            lt = self.font_tiny.render(label, True, COLOR_LABEL)
+            self.screen.blit(lt, (panel.x + pad + gs + 10,
+                                  y + row_h // 2 - lt.get_height() // 2))
+            y += row_h
+
+    def _draw_legend_glyph(self, kind, cx, cy, s, now):
+        surf = self.screen
+        col0 = AGENT_COLORS[0]
+        if kind == "drone":
+            icon = icons.get_icon("drone", s, col0,
+                                  phase=int((now // 40) % icons.DRONE_PHASES))
+            surf.blit(icon, (cx - s // 2, cy - s // 2))
+        elif kind == "wreck":
+            surf.blit(icons.get_icon("wreck", s), (cx - s // 2, cy - s // 2))
+        elif kind == "distress":
+            pygame.draw.circle(surf, theme.DANGER, (cx, cy), s // 2, 2)
+            pygame.draw.circle(surf, theme.DANGER, (cx, cy), s // 4, 1)
+        elif kind == "link":
+            effects.draw_dashed_line(surf, theme.COMM, (cx - s + 2, cy),
+                                     (cx + s - 2, cy), width=2, dash=5, gap=3,
+                                     offset=now * 0.04)
+            pygame.draw.circle(surf, (255, 246, 205), (cx, cy), 3)
+        elif kind == "ripple":
+            pygame.draw.circle(surf, theme.COMM, (cx, cy), s // 2, 1)
+            pygame.draw.circle(surf, theme.COMM, (cx, cy), s // 3, 1)
+        elif kind == "ghost":
+            surf.blit(icons.get_icon("target_ghost", s), (cx - s // 2, cy - s // 2))
+        elif kind == "beacon":
+            surf.blit(icons.get_icon("target_core", s), (cx - s // 2, cy - s // 2))
+        elif kind == "nav":
+            pygame.draw.line(surf, COLOR_NAV_PATH, (cx - s + 2, cy), (cx + s - 4, cy), 3)
+            pygame.draw.circle(surf, COLOR_NAV_PATH, (cx + s - 4, cy), 4, 2)
+        elif kind == "trail":
+            for k in range(3):
+                col = theme.blend(theme.BG, col0, 0.30 + 0.30 * k)
+                pygame.draw.circle(surf, col, (cx - s // 2 + k * (s // 2), cy), 3)
+        elif kind == "fog":
+            pygame.draw.rect(surf, theme.FOG,
+                             pygame.Rect(cx - s // 2, cy - s // 2 + 1, s // 2, s - 2))
+            pygame.draw.rect(surf, theme.FREE,
+                             pygame.Rect(cx, cy - s // 2 + 1, s // 2, s - 2))
 
     def _draw_toolbar(self):
         w = self.screen.get_width()
         bar = pygame.Rect(0, 0, w, self.TOOLBAR_H)
         pygame.draw.rect(self.screen, COLOR_TOOLBAR_BG, bar)
-        pygame.draw.line(self.screen, COLOR_BORDER,
-                         (0, self.TOOLBAR_H - 1), (w, self.TOOLBAR_H - 1), 1)
 
         self._buttons = {}
-        x, y = 8, 7
-        bh = self.TOOLBAR_H - 14
-        glyphs = {"play": "> Play", "pause": "|| Pause", "step": ">| Step"}
+        bh = self.TOOLBAR_H - 16
+        y = (self.TOOLBAR_H - 4 - bh) // 2       # leave the bottom 4px to the strip
+        x = 8
+
+        # Transport: square icon buttons (triangle / bars / bar+triangle).
         for key in ("play", "pause", "step"):
-            rect = pygame.Rect(x, y, 80, bh)
+            rect = pygame.Rect(x, y, 34, bh)
             active = (key == "play" and self.playing) or (key == "pause" and not self.playing)
             disabled = (key == "step" and self.playing)
-            col = COLOR_BTN_ACTIVE if active else (COLOR_BTN_DISABLED if disabled else COLOR_BTN)
-            pygame.draw.rect(self.screen, col, rect)
-            pygame.draw.rect(self.screen, COLOR_BORDER, rect, 1)
-            tcol = (20, 20, 20) if active else (COLOR_LABEL if disabled else COLOR_TEXT)
-            self.screen.blit(self.font_small.render(glyphs[key], True, tcol),
-                             (rect.x + 7, rect.y + (bh - 12) // 2))
+            theme.draw_button(self.screen, rect, "", self.font_small,
+                              active=active, disabled=disabled)
+            self._draw_transport_glyph(key, rect, active, disabled)
             self._buttons[key] = rect
-            x += 86
+            x += 38
 
-        # Comm-range toggle button
-        comm_rect = pygame.Rect(x, y, 88, bh)
-        on = self.show_comm_range
-        ccol = COLOR_BTN_ACTIVE if on else COLOR_BTN
-        pygame.draw.rect(self.screen, ccol, comm_rect)
-        pygame.draw.rect(self.screen, COLOR_BORDER, comm_rect, 1)
-        ctcol = (20, 20, 20) if on else COLOR_TEXT
-        self.screen.blit(self.font_small.render("(C) Comm", True, ctcol),
-                         (comm_rect.x + 7, comm_rect.y + (bh - 12) // 2))
-        self._buttons["comm"] = comm_rect
-        x += 94
+        x += 8
+        # Toggle chips.
+        chips = (("comm",   "Comm",  self.show_comm_range),
+                 ("smooth", "Move",  self.smooth),
+                 ("trails", "Trail", self.show_trails),
+                 ("legend", "Key",   self.show_legend))
+        for key, label, on in chips:
+            cw = self.font_small.size(label)[0] + 22
+            rect = pygame.Rect(x, y + (bh - 24) // 2, cw, 24)
+            theme.draw_chip(self.screen, rect, label, self.font_small, on)
+            self._buttons[key] = rect
+            x += cw + 6
 
-        # Status indicator
+        x += 8
+        # Speed group: [-] 1.0x [+]
+        sb = 22
+        sy = y + (bh - sb) // 2
+        down = pygame.Rect(x, sy, sb, sb)
+        theme.draw_button(self.screen, down, "-", self.font_small,
+                          disabled=self.speed_idx == 0)
+        self._buttons["speed_down"] = down
+        x += sb + 2
+        ts = self.font_small.render(f"{self.speed:g}x", True, COLOR_TEXT)
+        self.screen.blit(ts, (x + (34 - ts.get_width()) // 2,
+                              self.TOOLBAR_H // 2 - 2 - ts.get_height() // 2))
+        x += 36
+        up = pygame.Rect(x, sy, sb, sb)
+        theme.draw_button(self.screen, up, "+", self.font_small,
+                          disabled=self.speed_idx == len(self.SPEED_STEPS) - 1)
+        self._buttons["speed_up"] = up
+        x += sb + 14
+
+        # Status indicator (text only when there is room).
         status = "PLAYING" if self.playing else "PAUSED"
         scol = COLOR_PLAYING if self.playing else COLOR_PAUSED
-        cx = x + 12
-        pygame.draw.circle(self.screen, scol, (cx, self.TOOLBAR_H // 2), 7)
-        self.screen.blit(self.font_big.render(status, True, scol),
-                         (cx + 14, (self.TOOLBAR_H - 15) // 2))
+        cy = (self.TOOLBAR_H - 4) // 2
+        pygame.draw.circle(self.screen, scol, (x + 7, cy), 6)
+        if w >= 1000:
+            st = self.font_big.render(status, True, scol)
+            self.screen.blit(st, (x + 18, cy - st.get_height() // 2))
 
+        # Right-aligned info string.
         alive = getattr(self.env, "agent_alive", None)
         alive_txt = ""
         if alive is not None:
             n_alive = int(sum(bool(a) for a in alive))
-            alive_txt = f"alive {n_alive}/{self.env.n_agents}   "
-        info = f"{alive_txt}FPS {self.FPS}   step {int(getattr(self.env, 'step_count', 0))}"
-        iw = self.font_small.size(info)[0]
-        icol = COLOR_BROKEN_X if (alive is not None and not all(alive)) else COLOR_LABEL
-        self.screen.blit(self.font_small.render(info, True, icol),
-                         (w - iw - 10, (self.TOOLBAR_H - 12) // 2))
+            alive_txt = f"alive {n_alive}/{self.env.n_agents}  ·  "
+        mode_txt = (f"{self.FPS_SMOOTH}fps smooth" if self.smooth
+                    else f"{self.FPS}fps stepped")
+        info = (f"{alive_txt}step {int(getattr(self.env, 'step_count', 0))}"
+                f"  ·  {mode_txt} x{self.speed:g}")
+        it = self.font_small.render(
+            info, True,
+            COLOR_BROKEN_X if (alive is not None and not all(alive)) else COLOR_LABEL)
+        self.screen.blit(it, (w - it.get_width() - 10, cy - it.get_height() // 2))
+
+        # Episode progress strip along the toolbar's bottom edge.
+        strip = pygame.Rect(0, self.TOOLBAR_H - 4, w, 4)
+        pygame.draw.rect(self.screen, COLOR_BTN_DISABLED, strip)
+        ms = getattr(self.env, "max_steps", None)
+        if ms:
+            denom = int(ms) * max(1, int(getattr(self.env, "n_agents", 1)))
+            frac = min(1.0, int(getattr(self.env, "step_count", 0)) / max(1, denom))
+            if frac < 0.8:
+                fill = theme.ACCENT
+            else:
+                fill = theme.blend(theme.WARNING, theme.DANGER, (frac - 0.8) / 0.2)
+            pygame.draw.rect(self.screen, fill,
+                             pygame.Rect(0, strip.y, int(w * frac), 4))
+
+    def _draw_transport_glyph(self, key, rect, active, disabled):
+        col = (18, 24, 20) if active else (COLOR_LABEL if disabled else COLOR_TEXT)
+        cx, cy = rect.centerx, rect.centery
+        if key == "play":
+            pygame.draw.polygon(self.screen, col,
+                                [(cx - 4, cy - 6), (cx - 4, cy + 6), (cx + 6, cy)])
+        elif key == "pause":
+            pygame.draw.rect(self.screen, col, pygame.Rect(cx - 6, cy - 6, 4, 12))
+            pygame.draw.rect(self.screen, col, pygame.Rect(cx + 2, cy - 6, 4, 12))
+        else:  # step: triangle + bar
+            pygame.draw.polygon(self.screen, col,
+                                [(cx - 7, cy - 6), (cx - 7, cy + 6), (cx + 3, cy)])
+            pygame.draw.rect(self.screen, col, pygame.Rect(cx + 5, cy - 6, 3, 12))
 
     def _draw_grid(self):
         env = self.env
-        H, W, cs = env.H, env.W, self.CELL
+        cs = self.CELL
         y_off = self.TOOLBAR_H
-        merged_vis, merged_obs = self._merged_maps()
+        now = self._now()
+        view = effects.GridView(cs, y_off)
+        grid_rect = pygame.Rect(0, y_off, env.W * cs, env.H * cs)
 
+        if (self._terrain_dirty or self._terrain_surf is None
+                or self._terrain_surf.get_size() != grid_rect.size):
+            self._build_terrain()
+        self.screen.blit(self._terrain_surf, (0, y_off))
+
+        # Under-pass: translucent layers below the entity icons.
+        overlay = self._get_overlay()
+        overlay.fill((0, 0, 0, 0))
+        overlay.set_clip(grid_rect)
+        self.fx.draw_under(overlay, view, now)        # fog fade-ins
+        if self.show_trails:
+            self._draw_trails(overlay, view)
+        if self.show_comm_range:
+            self._draw_comm_ranges(overlay, cs, y_off)
+        self._draw_links(overlay, view, now)
+        overlay.set_clip(None)
+        self.screen.blit(overlay, (0, 0))
+
+        self._draw_target(cs, y_off, now)
+        self._draw_nav_paths(cs, y_off)
+        self._draw_entities(cs, y_off, now)
+
+        # Over-pass: beacons, smoke, ripples and flashes above the entities.
+        overlay.fill((0, 0, 0, 0))
+        overlay.set_clip(grid_rect)
+        self._draw_beacons(overlay, view, now)
+        self.fx.draw_over(overlay, view, now)
+        overlay.set_clip(None)
+        self.screen.blit(overlay, (0, 0))
+
+    def _build_terrain(self):
+        """Rebuild the cached terrain layer (fog / explored / obstacles).
+
+        Rebuilt only when the merged team knowledge changed (once per round)
+        or on resize; per frame the whole grid is a single blit."""
+        env = self.env
+        H, W, cs = env.H, env.W, self.CELL
+        size = (W * cs, H * cs)
+        if self._terrain_surf is None or self._terrain_surf.get_size() != size:
+            self._terrain_surf = pygame.Surface(size)
+        surf = self._terrain_surf
+        merged_vis, merged_obs = self._merged_maps()
+        surf.fill(theme.FOG)
+        hairline = cs >= 6
+        bevel = cs >= 8
         for r in range(H):
             for c in range(W):
-                x, y = c * cs, r * cs + y_off
+                x, y = c * cs, r * cs
                 rect = pygame.Rect(x, y, cs, cs)
                 if merged_obs[r, c] > 0:
-                    color = COLOR_OBSTACLE
+                    pygame.draw.rect(surf, theme.OBSTACLE, rect)
+                    if bevel:
+                        pygame.draw.line(surf, theme.OBSTACLE_HI,
+                                         (x + 1, y + 1), (x + cs - 2, y + 1))
+                        pygame.draw.line(surf, theme.OBSTACLE_HI,
+                                         (x + 1, y + 1), (x + 1, y + cs - 2))
+                        pygame.draw.line(surf, theme.OBSTACLE_LO,
+                                         (x + 1, y + cs - 2), (x + cs - 2, y + cs - 2))
+                        pygame.draw.line(surf, theme.OBSTACLE_LO,
+                                         (x + cs - 2, y + 1), (x + cs - 2, y + cs - 2))
                 elif merged_vis[r, c] > 0:
-                    color = COLOR_FREE
-                else:
-                    color = COLOR_UNKNOWN
-                pygame.draw.rect(self.screen, color, rect)
-                if cs >= 6:
-                    pygame.draw.rect(self.screen, COLOR_GRID_LINE, rect, 1)
+                    pygame.draw.rect(surf, theme.FREE, rect)
+                    if hairline:
+                        pygame.draw.rect(surf, theme.FREE_GRID, rect, 1)
+                elif hairline:
+                    pygame.draw.rect(surf, theme.FOG_GRID, rect, 1)
+        self._terrain_dirty = False
 
-        tr, tc = env.target_pos
-        margin = max(2, cs // 6)
-        pygame.draw.rect(
-            self.screen, COLOR_TARGET,
-            pygame.Rect(tc * cs + margin, tr * cs + y_off + margin,
-                        cs - 2 * margin, cs - 2 * margin),
-        )
+    def _get_overlay(self):
+        """Reusable full-window SRCALPHA surface (avoids per-frame allocation)."""
+        size = self.screen.get_size()
+        if self._overlay is None or self._overlay.get_size() != size:
+            self._overlay = pygame.Surface(size, pygame.SRCALPHA)
+        return self._overlay
 
-        if self.show_comm_range:
-            self._draw_comm_ranges(cs, y_off)
+    def _display_positions(self):
+        """Agent positions actually drawn (float grid coords; tweened in
+        smooth mode). Snaps to the env state when unset or team size changed."""
+        cur = [(float(r), float(c)) for r, c in self.env.agent_pos]
+        if self._display_pos is None or len(self._display_pos) != len(cur):
+            self._display_pos = cur
+        return self._display_pos
 
-        self._draw_nav_paths(cs, y_off)
+    def _cell_center(self, r, c, cs, y_off):
+        return int(c * cs + cs / 2), int(r * cs + y_off + cs / 2)
 
-        for i, (r, c) in enumerate(env.agent_pos):
+    def _draw_target(self, cs, y_off, now):
+        """Ghost marker while undiscovered (spectator-only knowledge), full
+        beacon core once any drone has spotted the target."""
+        tr, tc = self.env.target_pos
+        px, py = self._cell_center(tr, tc, cs, y_off)
+        if self._target_discovered:
+            icon = icons.get_icon("target_core", max(8, int(cs * 1.15)))
+            icon.set_alpha(255)
+        else:
+            icon = icons.get_icon("target_ghost", max(8, int(cs * 1.05)))
+            icon.set_alpha(120 + int(50 * math.sin(now / 480.0)))
+        self.screen.blit(icon, (px - icon.get_width() // 2,
+                                py - icon.get_height() // 2))
+
+    def _draw_trails(self, overlay, view):
+        """Fading dots over each drone's recently visited cells."""
+        rad = max(2, view.cs // 5)
+        for i, trail in enumerate(self._trails):
+            color = AGENT_COLORS[i % len(AGENT_COLORS)]
+            n = len(trail)
+            for k, cell in enumerate(trail):
+                alpha = int(15 + 85 * (k + 1) / n)
+                pygame.draw.circle(overlay, theme.with_alpha(color, alpha),
+                                   view.center(cell), rad)
+
+    def _draw_links(self, overlay, view, now):
+        """Animated dashed link + traveling pulse between drones in contact."""
+        pos = self._display_positions()
+        for (i, j, _d) in self._active_pairs:
+            if i >= len(pos) or j >= len(pos):
+                continue
+            if not (self._is_alive(i) and self._is_alive(j)):
+                continue
+            effects.draw_link(overlay, view.center(pos[i]), view.center(pos[j]),
+                              AGENT_COLORS[i % len(AGENT_COLORS)],
+                              AGENT_COLORS[j % len(AGENT_COLORS)],
+                              view.cs, now)
+
+    def _draw_beacons(self, overlay, view, now):
+        """Wreck smoke + distress rings + knower pips, and the target beacon.
+
+        Fault knowledge is read per drone (agent_known_crashed) — the beacon
+        stays loud until every live drone knows about that crash."""
+        env = self.env
+        cs = view.cs
+        crash_pos = getattr(env, "crash_pos", None) or {}
+        known = getattr(env, "agent_known_crashed", None)
+        alive_idx = [i for i in range(env.n_agents) if self._is_alive(i)]
+        for k, (kr, kc) in crash_pos.items():
+            center = view.center((kr, kc))
+            effects.draw_smoke(overlay, center, cs, now, seed=int(k))
+            knowers = ([i for i in alive_idx if k in known[i]]
+                       if known is not None else alive_idx)
+            if alive_idx and len(knowers) < len(alive_idx):
+                # Active distress: loud double ring until the team knows.
+                effects.draw_expanding_rings(
+                    overlay, center, 0.3 * cs, 2.2 * cs, theme.DANGER,
+                    1100, now, width=max(2, cs // 9), n_rings=2, alpha_max=190)
+            else:
+                # Acknowledged (or nobody left): quiet slow ring.
+                effects.draw_expanding_rings(
+                    overlay, center, 0.3 * cs, 1.4 * cs, theme.DANGER,
+                    2200, now, width=2, n_rings=1, alpha_max=70)
+            if cs >= 16 and alive_idx:
+                self._draw_knower_pips(overlay, center, alive_idx, knowers, cs)
+        if self._target_discovered:
+            effects.draw_expanding_rings(
+                overlay, view.center(tuple(env.target_pos)), 0.35 * cs,
+                1.8 * cs, theme.TARGET, 1400, now, width=2, n_rings=2,
+                alpha_max=150)
+
+    def _draw_knower_pips(self, overlay, center, alive_idx, knowers, cs):
+        """Tiny dots above a wreck: one per live teammate, filled if it knows
+        about this crash, hollow if the distress beacon hasn't reached it."""
+        cx, cy = center
+        sp = max(6, int(cs * 0.30))
+        rad = max(2, cs // 8)
+        x0 = cx - sp * (len(alive_idx) - 1) / 2
+        y = cy - int(cs * 0.95)
+        for slot, i in enumerate(alive_idx):
+            color = AGENT_COLORS[i % len(AGENT_COLORS)]
+            p = (int(x0 + slot * sp), y)
+            if i in knowers:
+                pygame.draw.circle(overlay, theme.with_alpha(color, 235), p, rad)
+            else:
+                pygame.draw.circle(overlay, theme.with_alpha((15, 16, 22), 200), p, rad)
+                pygame.draw.circle(overlay, theme.with_alpha(color, 160), p, rad, 1)
+
+    def _draw_entities(self, cs, y_off, now):
+        env = self.env
+        pos = self._display_positions()
+        for i, (r, c) in enumerate(pos):
+            px, py = self._cell_center(r, c, cs, y_off)
             broken = not self._is_alive(i)
-            color  = AGENT_COLORS[i % len(AGENT_COLORS)]
-            if broken:
-                color = COLOR_BROKEN
-            elif self._comm_flash.get(i, 0) > 0:
-                color = COLOR_COMM_FLASH
-            cx = c * cs + cs // 2
-            cy = r * cs + y_off + cs // 2
-            rad = max(3, cs // 2 - 2)
-            pygame.draw.circle(self.screen, color, (cx, cy), rad)
+            color = AGENT_COLORS[i % len(AGENT_COLORS)]
+            if cs >= 12:
+                isz = int(cs * 1.3)
+                phase = 0 if broken else int((now // 40) % icons.DRONE_PHASES)
+                icon = icons.get_icon("wreck" if broken else "drone",
+                                      isz, color, phase=phase)
+                self.screen.blit(icon, (px - isz // 2, py - isz // 2))
+                if not broken and i < len(self._heading) and self._heading[i]:
+                    self._draw_heading_marker(px, py, self._heading[i], cs, color)
+            else:
+                # Tiny cells: fall back to the plain circle (+ X for wrecks).
+                rad = max(3, cs // 2 - 2)
+                pygame.draw.circle(self.screen,
+                                   COLOR_BROKEN if broken else color, (px, py), rad)
+                if broken:
+                    lw = max(2, cs // 8)
+                    pygame.draw.line(self.screen, COLOR_BROKEN_X,
+                                     (px - rad, py - rad), (px + rad, py + rad), lw)
+                    pygame.draw.line(self.screen, COLOR_BROKEN_X,
+                                     (px - rad, py + rad), (px + rad, py - rad), lw)
             if cs >= 14:
-                label = self.font_small.render(str(i), True, (0, 0, 0))
-                self.screen.blit(label, (cx - 5, cy - 7))
-            if broken:
-                # Red X over the wreck.
-                lw = max(2, cs // 8)
-                pygame.draw.line(self.screen, COLOR_BROKEN_X,
-                                 (cx - rad, cy - rad), (cx + rad, cy + rad), lw)
-                pygame.draw.line(self.screen, COLOR_BROKEN_X,
-                                 (cx - rad, cy + rad), (cx + rad, cy - rad), lw)
+                label = icons.get_label(str(i), cs)
+                self.screen.blit(label, (px - label.get_width() // 2,
+                                         py - label.get_height() // 2))
+
+    def _draw_heading_marker(self, px, py, head, cs, color):
+        """Small triangle at the body edge pointing along the last move."""
+        dr, dc = head
+        n = (dr * dr + dc * dc) ** 0.5
+        if n == 0:
+            return
+        ux, uy = dc / n, dr / n
+        tip = (px + ux * cs * 0.62, py + uy * cs * 0.62)
+        left = (px + ux * cs * 0.34 - uy * cs * 0.16,
+                py + uy * cs * 0.34 + ux * cs * 0.16)
+        right = (px + ux * cs * 0.34 + uy * cs * 0.16,
+                 py + uy * cs * 0.34 - ux * cs * 0.16)
+        pygame.draw.polygon(self.screen, theme.brighten(color, 45),
+                            [tip, left, right])
 
     def _draw_nav_paths(self, cs, y_off):
         """Overlay the BFS auto-nav path of each homing drone (set by the
@@ -648,22 +1103,20 @@ class DroneRenderer:
             # Ring around the homing drone so the mode switch is visible.
             pygame.draw.circle(self.screen, COLOR_NAV_PATH, pts[0], max(4, cs // 2), 2)
 
-    def _draw_comm_ranges(self, cs, y_off):
-        """Translucent overlay of each drone's communication range — a diamond for
+    def _draw_comm_ranges(self, overlay, cs, y_off):
+        """Translucent comm-range shapes on the shared overlay — a diamond for
         the Manhattan metric, a circle for Euclidean. Toggled with (C) / the
-        Comm button. Drawn under the drone markers."""
+        Comm chip. Drawn under the drone markers."""
         env = self.env
         rng = int(getattr(env, "comm_range", 0))
         if rng <= 0:
             return
         metric = getattr(env, "comm_metric", "manhattan")
-        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
-        for i, (r, c) in enumerate(env.agent_pos):
+        for i, (r, c) in enumerate(self._display_positions()):
             if not self._is_alive(i):
                 continue                 # wrecks have no radio
             color = AGENT_COLORS[i % len(AGENT_COLORS)]
-            cx = c * cs + cs // 2
-            cy = r * cs + y_off + cs // 2
+            cx, cy = self._cell_center(r, c, cs, y_off)
             fill = (color[0], color[1], color[2], 32)
             line = (color[0], color[1], color[2], 150)
             R = rng * cs
@@ -674,7 +1127,6 @@ class DroneRenderer:
             else:
                 pygame.draw.circle(overlay, fill, (cx, cy), R)
                 pygame.draw.circle(overlay, line, (cx, cy), R, 2)
-        self.screen.blit(overlay, (0, 0))
 
     # --- Sidebar ----------------------------------------------------------
 
@@ -793,7 +1245,7 @@ class DroneRenderer:
 
         if broken:
             border_col = COLOR_BROKEN_X
-        elif self._comm_flash.get(i, 0) > 0:
+        elif self._comm_flash_until.get(i, 0) > self._now():
             border_col = COLOR_COMM_FLASH
         else:
             border_col = color
