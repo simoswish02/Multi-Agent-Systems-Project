@@ -59,16 +59,31 @@
 
 \begin{abstract}
 \noindent
-% TODO: write last, once §1–§9 are drafted. One paragraph covering:
-% problem (cooperative target search under partial observability, limited
-% communication, step budget, and random in-mission drone faults) — approach
-% (single shared Dueling Double DQN policy, domain randomization + context
-% conditioning, decentralized fault knowledge via distress beacons) — MAS
-% reading (coordination without protocols, emergent dispersion, artefact and
-% autonomy analysis) — experimental findings (fault robustness, generalization)
-% — ethical/regulatory analysis (GDPR, EU AI Act, dual-use and autonomous
-% weapons scenario).
-Abstract placeholder.
+We study cooperative target search by a team of drones on a partially
+observable grid, under limited communication, a fixed time budget, and ---
+the defining extension of this work --- the possibility that any drone
+permanently breaks at any moment, with no central authority to announce the
+loss. A single Dueling Double DQN with parameter sharing drives every drone
+through one shared forward pass; per-episode domain randomization and a compact
+context vector turn that one policy into a generalist across team size,
+sensing, communication range, obstacle density, and fault rate. Fault
+knowledge is fully decentralized: a wreck emits only a passive distress
+beacon, and crash information spreads through the same range-limited map fusion
+as any other observation, so each drone acts on a sound-but-possibly-stale
+belief about how many teammates remain. We read the resulting system through
+the multi-agent paradigm --- coordination without protocols, environment-%
+mediated (stigmergic) dispersion, an artefact and autonomy analysis, and an
+epistemic account of fault handling --- and evaluate it empirically. The
+single policy generalizes across every randomization axis, including
+\emph{beyond} its trained ranges on team size, vision, and communication, and
+--- most importantly --- degrades \emph{gracefully} under faults: across the
+entire trained fault range success drops by under six points while the team
+loses, on average, more than half a drone, and even at more than triple the
+trained fault rate it still completes two missions in three, with no cliff. We
+close with an ethical and regulatory analysis (GDPR, the EU AI Act and its
+military carve-out, and the autonomous-weapons scenario) that takes seriously
+the dual-use nature of a capability whose fault tolerance would make an attack
+swarm as resilient as a rescue one.
 \end{abstract}
 
 \newpage

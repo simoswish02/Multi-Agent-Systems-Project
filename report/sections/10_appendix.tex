@@ -1,21 +1,202 @@
-% Appendices (~2-3 pages total). \appendix is issued in main.tex.
+% Appendices. \appendix is issued in main.tex.
 
 \section{Configuration and Hyperparameters}
 \label{app:config}
-\draftpending
-% TODO: full configs/default.yaml as tables — environment parameters, DR
-% ranges, curriculum phases, agent/training hyperparameters (gamma, n_step,
-% buffer size, batch size, target sync, epsilon schedule, LR schedule, ...).
+
+All experiments are driven by a single configuration file
+(\texttt{configs/default.yaml}), the single source of truth referenced
+throughout Sections~\ref{sec:architecture}--\ref{sec:training}. The tables
+below reproduce the values used for the final run reported in this document.
+The reward terms are not repeated here; they are given in
+Table~\ref{tab:reward}.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Notes} \\
+\midrule
+Grid size            & $\gridsize\times\gridsize$ & fixed; never randomized (Invariant~1) \\
+Action space         & $4$ (up/down/left/right)   & no ``stay'' action; masked at grid/obstacle edges \\
+Vision metric        & Chebyshev                  & $(2\rvis{+}1)^2$ square window \\
+Comm.\ metric        & Manhattan                  & range-limited pairwise map fusion \\
+Global channels      & $6$                        & Visited, Obstacle, Trajectory, Target, Own\_Position, Broken \\
+Local channels       & $5$                        & cropped $13\times13$ egocentric patch \\
+Context dimension    & $5$                        & $[\rvis, \rcomm, \nagents, \text{agent\_id}, \hat n]$ \\
+Discount $\gamma$    & $0.97$                     & effective horizon for search \\
+\bottomrule
+\end{tabular}
+\caption{Environment and observation constants.}
+\label{tab:app-env}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Factor} & \textbf{Range (final run)} & \textbf{Normalization denom.} \\
+\midrule
+Vision radius $\rvis$      & $[1, 6]$ (integer)     & $6$ \\
+Comm.\ range $\rcomm$      & $[2, 12]$ (integer)    & $12$ \\
+Team size $\nagents$       & $[1, 4]$ (integer)     & $4$ (also used for agent\_id, $\hat n$) \\
+Obstacle density $\rho$    & $[0.10, 0.30]$ (float) & environment-level (not a context entry) \\
+Fault prob.\ $\pfault$     & $[0.0, 0.003]$ (float) & environment-level (not a context entry) \\
+\bottomrule
+\end{tabular}
+\caption{Per-episode domain-randomization ranges, sampled uniformly at every
+reset (Section~\ref{subsec:train-dr}). Context factors are normalized by their
+maxima (Section~\ref{subsec:arch-context}); density and fault probability are
+deliberately \emph{not} exposed to the network.}
+\label{tab:app-dr}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Phase} & \textbf{Episodes} & \textbf{Overrides} \\
+\midrule
+\texttt{test}               & $0$ (skipped)  & staging placeholder; narrower \texttt{dr\_override} \\
+\texttt{mas\_50k\_dr\_faults} & $50{,}000$   & \texttt{max\_steps}${=}200$, \texttt{n\_agents}${=}4$ (buffer sizing) \\
+\bottomrule
+\end{tabular}
+\caption{Curriculum. The final policy is trained from scratch in the single
+main phase; the zero-episode debug phase is kept only for staging
+(Section~\ref{subsec:train-curriculum}). The phase's \texttt{n\_agents} sets
+the initial allocation and replay-buffer width; team size is still resampled
+in $[1,4]$ every episode from the ranges of Table~\ref{tab:app-dr}.}
+\label{tab:app-curriculum}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} & \textbf{Notes} \\
+\midrule
+Optimizer                 & Adam           & weight decay $10^{-6}$ \\
+Learning rate             & $10^{-4}\!\to\!5\times10^{-4}\!\to\!10^{-6}$ & linear warmup ($10\%$) then cosine; per episode \\
+Gradient clip             & $1.0$          & global norm \\
+Discount $\gamma$         & $0.97$         & --- \\
+$n$-step return           & $3$            & per-agent windows; team credit needs $n\!\ge\!2$ \\
+Loss                      & Huber (smooth $L_1$) & Double-DQN target \\
+Replay buffer             & $2\times10^5$  & uniform; not serialized in checkpoints \\
+Batch size                & $16$           & --- \\
+Update cadence            & every $4$ agent-turns & one gradient step \\
+Target sync               & every $500$ gradient steps & hard copy \\
+$\varepsilon$ schedule    & $1.0\!\to\!0.05$, $\times0.9995$/episode & floor at $\approx$ ep.\ $6{,}000$ \\
+FC head widths            & $1536\!\to\!768\!\to\!384$ & dueling head $Q=V+A-\overline{A}$ \\
+\bottomrule
+\end{tabular}
+\caption{Agent and training hyperparameters (Sections~\ref{subsec:arch-network},
+\ref{subsec:arch-learning}, \ref{subsec:train-schedules}). Network
+normalization is LayerNorm/GRN only, for batch-size-independent inference.}
+\label{tab:app-agent}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Setting} & \textbf{Value} & \textbf{Purpose} \\
+\midrule
+In-training eval interval  & every $1{,}000$ episodes & checkpoint selection \\
+In-training eval instances & $20$ fixed seeds         & success-dominant rule \\
+In-training eval $\varepsilon$ & $0.05$               & near-greedy \\
+Periodic checkpoint save   & every $2{,}500$ episodes & learning-curve axis \\
+Parallel watcher eval      & $200$ seeded episodes/checkpoint & crash-safe second opinion \\
+OFAT sweep seeds           & $500$ per point          & Section~\ref{sec:experiments} \\
+Learning-curve / heatmap seeds & $300$ per point      & Section~\ref{sec:experiments} \\
+\bottomrule
+\end{tabular}
+\caption{Evaluation protocol (Sections~\ref{subsec:train-infra},
+\ref{subsec:exp-setup}).}
+\label{tab:app-eval}
+\end{table}
+
+\FloatBarrier
 
 \section{Repository Guide}
 \label{app:repo}
-\draftpending
-% TODO: module map; entry points; how to reproduce: train / eval / sweep
-% commands (main.py --mode ..., eval_checkpoints.py,
-% testing/evaluate_policy.py); environment setup (conda env, requirements).
+
+The code is organized as a small set of packages behind three entry points.
+
+\paragraph{Module map.}
+\begin{itemize}[leftmargin=1.5em]
+  \item \texttt{env/} --- the environment package: \texttt{grid\_env.py}
+    (the \texttt{DroneSearchEnv}: generation with BFS reachability, sequential
+    \texttt{step\_agent}, reward, beacon detection, communication fusion) and
+    \texttt{utils.py} (BFS helpers and the eval-only \texttt{auto\_nav\_action}).
+  \item \texttt{agents/} --- \texttt{networks.py} (GlobalMapCNN, LocalCNN,
+    dueling head) and \texttt{dqn\_agent.py} (Double-DQN agent: action
+    selection, learning step, checkpoint I/O).
+  \item \texttt{training/} --- \texttt{train.py} (curriculum loop, domain
+    randomization, $n$-step windows, in-training evaluation).
+  \item \texttt{gui/} --- the renderer for the \texttt{play}, \texttt{eval},
+    and \texttt{simulate} modes (fault slider, auto-nav toggle).
+  \item \texttt{testing/} --- \texttt{evaluate\_policy.py} (the OFAT / fault /
+    heatmap / epoch harness) and \texttt{analysis.ipynb} (figure generation).
+  \item Top level --- \texttt{main.py} (all runtime modes),
+    \texttt{eval\_checkpoints.py} (batch and \texttt{--watch} checkpoint
+    ranking), and \texttt{configs/default.yaml} (single source of truth).
+\end{itemize}
+
+\paragraph{Environment setup.}
+\begin{verbatim}
+conda env create -f environment.yaml   # env "rl-drone": python 3.11, CUDA 11.8
+conda activate rl-drone
+# or, without conda:  pip install -r requirements.txt
+\end{verbatim}
+
+\paragraph{Reproducing the results.}
+\begin{verbatim}
+# Training (curriculum from configs/default.yaml; --resume to continue)
+python main.py --mode train
+
+# Qualitative inspection
+python main.py --mode eval  --checkpoint checkpoints/best.pt [--fault-prob P] [--auto-nav]
+python main.py --mode simulate            # GUI: fault slider, auto-nav toggle
+
+# The experiments of Section 7 (writes testing_results/{csv,plots})
+python testing/evaluate_policy.py --axis all      --seeds 500
+python testing/evaluate_policy.py --axis fault    --seeds 500 --auto-nav
+python testing/evaluate_policy.py --axis heatmaps --seeds 300
+python testing/evaluate_policy.py --axis epoch    --seeds 300
+# then run testing/analysis.ipynb to regenerate the figures
+\end{verbatim}
+
+\FloatBarrier
 
 \section{Additional Figures}
 \label{app:figures}
-\draftpending
-% TODO: extra plots that do not fit the body (full OFAT grids, extra
-% heatmaps, per-phase training curves).
+
+For completeness, Figures~\ref{fig:app-vision} and~\ref{fig:app-maxsteps}
+give the two one-factor sweeps summarized in Table~\ref{tab:generalization}
+but not shown in the body: the vision-radius and step-budget axes. The six
+panels of each follow the layout of Figures~\ref{fig:sweep-nagents}
+and~\ref{fig:sweep-density}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{fig_vision.png}
+\caption{Sensitivity to vision radius $\rvis$. Coverage rises monotonically
+with sight (top right), but success saturates around $\rvis = 3\text{--}4$:
+past a point the bottleneck is deciding where to go, not seeing farther. The
+OOD radii $\rvis = 7, 8$ (shaded) degrade only slightly.}
+\label{fig:app-vision}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{fig_max_steps.png}
+\caption{Sensitivity to the step budget $T$. Success rises with diminishing
+returns as the budget grows; a larger budget only rescues episodes that were
+already close to succeeding. No OOD region is defined for this axis (the
+budget is not a randomized factor).}
+\label{fig:app-maxsteps}
+\end{figure}
