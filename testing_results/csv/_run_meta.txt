@@ -1,0 +1,6 @@
+timestamp   : 2026-07-14T20:41:34.191456
+checkpoint  : checkpoints/mas_50k_dr_faults_ep50000.pt
+seeds       : 500 (2000..2499)
+ood         : True
+reference   : {'vision_radius': 3, 'comm_range': 5, 'n_agents': 3, 'obstacle_density': 0.2, 'max_steps': 200, 'fault_prob': 0.0}
+ctx_norm    : {'vision_radius': 6.0, 'comm_range': 12.0, 'n_agents': 4.0}
