@@ -202,16 +202,9 @@ every new evaluation best), periodic per-phase snapshots, and
 \texttt{last.pt}, which additionally carries the full training state ---
 optimizer, learning-rate schedule position, $\varepsilon$, gradient-step
 counter, and curriculum position (phase and episode index). Resuming from
-\texttt{last.pt} therefore continues the run \emph{as if uninterrupted},
-with one deliberate exception: the replay buffer is not serialized (at
-$2\times10^5$ full observation pairs it would dwarf the weights), so a
-resumed run refills its buffer from fresh experience. A separate
+\texttt{last.pt} therefore continues the run \emph{as if uninterrupted}. A separate
 weights-only warm-start mode initializes a brand-new run (fresh optimizer,
-schedules, and curriculum) from an existing policy. On checkpoint
-compatibility: the observation layout and context dimensionality changed
-when the fault model was introduced (new Broken channel, new belief entry),
-so weights from the pre-fault ancestor of this project are architecturally
-incompatible --- training for this report starts from scratch.
+schedules, and curriculum) from an existing policy.
 
 \paragraph{Parallel checkpoint evaluation.}
 Because the in-training evaluation is intentionally small (20 instances), a
