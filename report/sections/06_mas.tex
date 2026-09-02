@@ -3,25 +3,17 @@
 
 The preceding sections described \emph{what} was built and \emph{how} it is
 trained. This section changes register and asks what kind of system it is.
-Multi-agent systems are not merely a technology but an engineering
-perspective --- a way of decomposing a problem into autonomous, interacting,
-situated components and of locating where a system's intelligence actually
-resides \citep{jennings2001agent,wooldridge2009introduction}. Read through
-that lens, the drone team turns out to instantiate a remarkably wide slice
-of the multi-agent conceptual apparatus: agenthood and its defining
-properties (Section~\ref{subsec:mas-agents}), the environment as a
-first-class abstraction (Section~\ref{subsec:mas-environment}), coordination
-through knowledge exchange and environment-mediated traces
-(Section~\ref{subsec:mas-coordination}), artefacts that scaffold agent
-activity (Section~\ref{subsec:mas-artefacts}), self-organisation and
-emergent structure (Section~\ref{subsec:mas-emergence}), decentralized
-resilience grounded in per-agent belief (Section~\ref{subsec:mas-resilience}),
-graduated autonomy (Section~\ref{subsec:mas-autonomy}), and multi-agent
-learning (Section~\ref{subsec:mas-learning}). Throughout, every conceptual
-claim is anchored to a concrete mechanism from
-Sections~\ref{sec:problem}--\ref{sec:training}; the section closes by asking,
-honestly, what a richer multi-agent design would add and at what cost
-(Section~\ref{subsec:mas-beyond}).
+Multi-agent systems are not merely a technology but an engineering perspective
+--- a way of decomposing a problem into autonomous, interacting, situated
+components and of locating where a system's intelligence actually resides
+\citep{jennings2001agent,wooldridge2009introduction}. Read through that lens the
+drone team instantiates a remarkably wide slice of the multi-agent conceptual
+apparatus, from agenthood and the environment-as-abstraction through
+coordination, artefacts, self-organisation, resilience and graduated autonomy to
+multi-agent learning. Throughout, every conceptual claim is anchored to a
+concrete mechanism from Sections~\ref{sec:problem}--\ref{sec:training}; the
+section closes by asking, honestly, what a richer multi-agent design would add
+and at what cost (Section~\ref{subsec:mas-beyond}).
 
 \subsection{Why a multi-agent formulation}
 \label{subsec:mas-why}
@@ -57,24 +49,22 @@ any subset of drones leaves every survivor as capable as before. Autonomy
 here is not an aesthetic commitment: it is what makes graceful degradation
 possible at all.
 
-\emph{Interaction as the source of system-level competence.} Finally, the
-task is one no single drone solves well: the budget $T_{\max}$ scales with
-$\nagents$ but a lone searcher covers area linearly in time, while a
-well-dispersed team covers it in parallel. The system-level competence ---
-sweep the map quickly, avoid duplicated effort, re-cover the sectors of
-fallen teammates --- is not located in any individual policy evaluation; it
-arises \emph{between} the drones, from their interactions through fusion,
-mutual observation, and shared spatial traces. That is precisely the
-signature property that distinguishes a multi-agent system from a parallel
-implementation of a single-agent one \citep{wooldridge2009introduction}.
+\emph{Interaction as the source of system-level competence.} Finally, the task
+is one no single drone solves well: a lone searcher covers area linearly in time,
+while a well-dispersed team covers it in parallel. The system-level competence
+--- sweep the map quickly, avoid duplicated effort, re-cover the sectors of
+fallen teammates --- is located in no individual policy evaluation; it arises
+\emph{between} the drones, from their interactions through fusion, mutual
+observation and shared spatial traces. That is precisely what distinguishes a
+multi-agent system from a parallel implementation of a single-agent one
+\citep{wooldridge2009introduction}.
 
-One clarification prevents a misunderstanding that will recur in
-Section~\ref{subsec:mas-learning}: the drones share network \emph{weights},
-and weight sharing is a training-time device, not a runtime coupling. At
-execution each drone evaluates its own copy of the function on its own
-inputs; no activation, gradient, or decision crosses drone boundaries. Four
-copies of the same brain, fed four different experiences, are four agents
---- just as identical twins are two people.
+One clarification prevents a recurring misunderstanding: the drones share network
+\emph{weights}, and weight sharing is a training-time device, not a runtime
+coupling. At execution each drone evaluates its own copy of the function on its
+own inputs; no activation, gradient, or decision crosses drone boundaries. Four
+copies of the same brain, fed four different experiences, are four agents --- just
+as identical twins are two people.
 
 \subsection{Drones as agents}
 \label{subsec:mas-agents}
@@ -88,47 +78,43 @@ the drone against each requirement --- and is equally explicit about which
 stronger notions the drone does \emph{not} satisfy.
 
 \paragraph{Autonomy: encapsulated control.}
-The most fundamental reading of autonomy in computational terms is
-encapsulation of control: an agent is a locus of decision that cannot be
-\emph{invoked} --- other components may influence it only through data, never
-by calling its behaviour as one calls a procedure
-\citep{wooldridge1995intelligent}. The drones satisfy this literally.
-Nothing in the system commands a drone: teammates cannot move it, interrupt
-it, or query it; the only thing that ever crosses the boundary between two
-drones is world knowledge, through fusion (Section~\ref{subsec:prob-comm}).
-Each drone's turn consists of reading \emph{its own} observation and
-context, evaluating \emph{its own} policy copy, and acting. Even the
-sequential round-robin scheduling (Section~\ref{subsec:prob-model}) does not
-breach encapsulation: it serializes \emph{when} drones act --- a property of
-the environment's clock --- not \emph{what} they decide.
+The most fundamental computational reading of autonomy is encapsulation of
+control: an agent is a locus of decision that cannot be \emph{invoked} --- other
+components may influence it only through data, never by calling its behaviour as
+one calls a procedure \citep{wooldridge1995intelligent}. The drones satisfy this
+literally. Nothing in the system commands a drone: teammates cannot move it,
+interrupt it, or query it, and the only thing that ever crosses the boundary
+between two drones is world knowledge, through fusion
+(Section~\ref{subsec:prob-comm}). Each turn consists of reading \emph{its own}
+observation and context, evaluating \emph{its own} policy copy, and acting. Even
+the round-robin scheduling (Section~\ref{subsec:prob-model}) does not breach
+encapsulation: it serializes \emph{when} drones act --- a property of the
+environment's clock --- not \emph{what} they decide.
 
 \paragraph{Situatedness.}
-Agents act \emph{in} and \emph{through} an environment, and their action
-cannot be divorced from the context in which it occurs
-\citep{suchman1987plans}. The drone's entire interface to the world is
-environmental: it perceives by revealing cells around its position, acts by
-moving through adjacent cells, and even its communication is
-situated --- fusion is triggered by spatial proximity, not by addressing a
-recipient. There is no action-at-a-distance anywhere in the system. Notably,
-the policy's inputs are spatial through and through
-(Section~\ref{subsec:arch-obs}): position, fault knowledge, and history all
-reach the network as \emph{maps}, an architectural echo of the fact that for
-this agent, context is location.
+Agents act \emph{in} and \emph{through} an environment, and their action cannot
+be divorced from the context in which it occurs \citep{suchman1987plans}. The
+drone's entire interface to the world is environmental: it perceives by revealing
+cells around its position, acts by moving to adjacent cells, and even its
+communication is situated --- fusion is triggered by spatial proximity, not by
+addressing a recipient. There is no action-at-a-distance anywhere in the system,
+and the policy's inputs are spatial through and through
+(Section~\ref{subsec:arch-obs}): position, fault knowledge and history all reach
+the network as \emph{maps}, an architectural echo of the fact that for this agent
+context is location.
 
 \paragraph{Reactivity --- with state.}
 The classical formalization of a non-trivially reactive agent equips it with
-internal state: a perception function mapping environment states to
-percepts, a state-update function folding each percept into an internal
-state, and an action function from internal states to actions
-\citep{wooldridge2009introduction}. The drone realizes this triple exactly.
-Perception is the vision update (cells within $V_i^t$, plus beacon
-detection); the state update is the monotone accumulation into
-$K_i^t$ --- maps, trajectory counts, crash-site knowledge --- merged with
-teammates' contributions by fusion; the action function is the Q-network's
-masked greedy selection over the rendering of $K_i^t$. The internal state is
-what lifts the drone above a thermostat-style pure reflex: two drones on the
-same cell with the same vision act differently if their \emph{histories}
-differ, because their maps do.
+internal state: a perception function from environment states to percepts, a
+state-update function folding each percept into an internal state, and an action
+function from internal states to actions \citep{wooldridge2009introduction}. The
+drone realizes the triple exactly: perception is the vision update (cells within
+$V_i^t$, plus beacon detection); the state update is the monotone accumulation
+into $K_i^t$, merged with teammates' contributions by fusion; the action function
+is the Q-network's masked greedy selection over the rendering of $K_i^t$. That
+internal state is what lifts the drone above a thermostat-style pure reflex: two
+drones on the same cell with the same vision act differently if their
+\emph{histories} differ, because their maps do.
 
 \paragraph{Proactiveness --- distilled, not represented.}
 Agents are expected to exhibit goal-directed behaviour, taking initiative
@@ -175,41 +161,35 @@ strong one.
 \subsection{The environment as a first-class abstraction}
 \label{subsec:mas-environment}
 
-A recurring lesson of multi-agent engineering is that the environment is
-not scaffolding around the agents but a design dimension in its own right
---- an active entity with its own state, dynamics, and rules, through which
-agents perceive, act, and interact \citep{weyns2007environment}. This
-project embodies that stance structurally: \texttt{DroneSearchEnv} is not a
-thin arena but the locus of most of the system's semantics, and the agents
-are, by line count and by conceptual weight, the \emph{smaller} half of the
-design.
+A recurring lesson of multi-agent engineering is that the environment is not
+scaffolding around the agents but a design dimension in its own right --- an
+active entity with its own state, dynamics and rules, through which agents
+perceive, act and interact \citep{weyns2007environment}. This project embodies
+that stance structurally: \texttt{DroneSearchEnv} is not a thin arena but the
+locus of most of the system's semantics, and the agents are, by line count and by
+conceptual weight, the \emph{smaller} half of the design. Four environmental
+responsibilities deserve explicit notice. \emph{Topology and locality}: the grid,
+its Chebyshev vision neighbourhoods and its Manhattan communication distances
+define what ``near'' means, and thereby delimit perception, interaction and
+fusion --- locality is not a property agents happen to have but a rule the
+environment enforces uniformly on everyone. \emph{Dynamics}: the fault process
+lives in the environment, not in the agents --- drones do not decide to fail, the
+world fails them (Section~\ref{subsec:prob-fault}) --- as does the episode clock,
+including the rule that wrecks' turns still consume budget. \emph{Mediation}:
+every interaction between drones, whether fusion, mutual sighting or beacon
+detection, is computed by the environment as a side effect of spatial
+configuration, so drones have no channel to each other that bypasses the world
+--- exactly the situated-interaction discipline \citet{weyns2007environment}
+argue for. And \emph{governance}: the action mask constrains the space of legal
+behaviour at its source, while the reward terms of Table~\ref{tab:reward} are
+environmental legislation --- the incentive structure under which autonomous
+behaviour is shaped without ever being commanded.
 
-Four environmental responsibilities deserve explicit notice. First,
-\emph{topology and locality}: the grid, its Chebyshev vision neighbourhoods,
-and its Manhattan communication distances define what ``near'' means --- and
-thereby delimit perception, interaction, and fusion. Locality is not a
-property agents happen to have; it is a rule the environment enforces
-uniformly on everyone. Second, \emph{dynamics}: the fault process lives in
-the environment, not in the agents --- drones do not decide to fail, the
-world fails them (Section~\ref{subsec:prob-fault}); the same holds for the
-episode clock, including the rule that wrecks' turns still consume budget.
-Third, \emph{mediation}: every interaction between drones --- fusion,
-mutual sighting, beacon detection --- is computed by the environment as a
-side effect of spatial configuration; drones have no channel to each other
-that bypasses the world, which is exactly the situated-interaction
-discipline that \citet{weyns2007environment} argue for. Fourth,
-\emph{governance}: the action mask (Section~\ref{subsec:prob-model})
-constrains the space of legal behaviour at its source, and the reward terms
-of Table~\ref{tab:reward} are environmental legislation --- the incentive
-structure under which autonomous behaviour is shaped without ever being
-commanded.
-
-The methodological payoff of this separation appeared already in
-Section~\ref{sec:architecture}: because the environment owns the rules, the
-agents could be swapped (random, keyboard-driven, BFS-guided, learned) with
-zero change to the world's semantics --- and Section~\ref{sec:experiments}
-exploits exactly this to compare the learned policy against baselines on
-identical instances.
+The methodological payoff appeared already in Section~\ref{sec:architecture}:
+because the environment owns the rules, the agents could be swapped (random,
+keyboard-driven, BFS-guided, learned) with zero change to the world's semantics,
+which is exactly what Section~\ref{sec:experiments} exploits to compare the
+learned policy against baselines on identical instances.
 
 \subsection{Interaction and coordination}
 \label{subsec:mas-coordination}
@@ -223,40 +203,37 @@ assigned by any authority. Coordination arises from three mutually
 reinforcing mechanisms.
 
 \paragraph{(a) Knowledge-level communication without a language.}
-When two drones fuse maps, what travels is world knowledge --- ``these cells
-are free, these are obstacles, the target is here, teammate 3 crashed
-there'' --- and nothing else: no requests, commands, commitments, or any of
-the performatives that agent communication languages provide
-\citep{finin1994kqml}. The omission is principled rather than lazy. Speech
-acts exist to coordinate \emph{deliberating} agents: a request makes sense
-when the receiver can decide whether to honour it. Between sub-cognitive
-policies there is no deliberation to address, and the task is
-identical-interest --- there is nothing to negotiate over. What remains
+When two drones fuse maps, what travels is world knowledge --- ``these cells are
+free, these are obstacles, the target is here, teammate 3 crashed there'' --- and
+nothing else: no requests, commands, commitments, or any of the performatives
+that agent communication languages provide \citep{finin1994kqml}. The omission is
+principled rather than lazy. Speech acts exist to coordinate \emph{deliberating}
+agents: a request makes sense when the receiver can decide whether to honour it.
+Between sub-cognitive policies there is no deliberation to address, and the task
+is identical-interest --- there is nothing to negotiate over. What remains
 genuinely useful to exchange is exactly what \emph{is} exchanged: factual
-knowledge of the world, whose fusion is monotone (element-wise maximum) and
-therefore order-independent, idempotent, and conflict-free. The design
-question ``what should agents say to each other?'' is answered here with
-``nothing --- they should compare notes''.
+knowledge, whose fusion is monotone (element-wise maximum) and therefore
+order-independent, idempotent and conflict-free. The design question ``what
+should agents say to each other?'' is answered here with ``nothing --- they
+should compare notes''.
 
 \paragraph{(b) The fused map as a shared dataspace.}
-The communication pattern that results has the character of a
-\emph{blackboard} or generative dataspace rather than of message passing
-\citep{nii1986blackboard,gelernter1985generative}. Three properties of
-generative communication --- that emitted information outlives its
-producer, is accessible by content rather than by address, and decouples
-interacting parties in time and identity --- all hold of the fused
-knowledge. A cell discovered by drone 1 at round 10 shapes drone 4's
-decision at round 150, long after the encounter that transmitted it, and
-possibly via a relay chain (1 fused with 2, later 2 with 4) such that drones
-1 and 4 were \emph{never} within range of each other. And because fusion is
-an anonymous maximum (Section~\ref{subsec:prob-comm}), knowledge carries no
-provenance: the receiving drone acts on ``the target is at $(r,c)$''
-identically whether it saw the target itself or inherited the fact
-third-hand. The team's effective medium of coordination is thus a
-distributed, eventually-consistent shared map --- with the notable
-difference from a classical blackboard that there is no central board:
-every drone carries its own replica, and proximity events are the
-synchronization protocol.
+The resulting pattern has the character of a \emph{blackboard} or generative
+dataspace rather than of message passing
+\citep{nii1986blackboard,gelernter1985generative}: the three properties of
+generative communication --- emitted information outlives its producer, is
+accessible by content rather than by address, and decouples interacting parties
+in time and identity --- all hold of the fused knowledge. A cell discovered by
+drone 1 at round 10 shapes drone 4's decision at round 150, long after the
+encounter that transmitted it, possibly via a relay chain (1 fused with 2, later
+2 with 4) such that 1 and 4 were \emph{never} within range of each other; and
+because fusion is an anonymous maximum (Section~\ref{subsec:prob-comm}),
+knowledge carries no provenance --- the receiver acts on ``the target is at
+$(r,c)$'' identically whether it saw the target itself or inherited the fact
+third-hand. The team's effective medium of coordination is thus a distributed,
+eventually-consistent shared map, differing from a classical blackboard in having
+no central board: every drone carries its own replica, and proximity events are
+the synchronization protocol.
 
 \paragraph{(c) Stigmergic traces --- virtualized.}
 The third mechanism is coordination through the \emph{traces} of activity,
@@ -308,36 +285,32 @@ here because it cleanly separates the system's two kinds of components ---
 and locates several load-bearing pieces of the design on the artefact side
 of the line.
 
-The clearest instance is the \emph{accumulated map}. Under the artefact
-reading, each drone's knowledge state is a cognitive artefact with a
-definite function (aggregate spatial knowledge), a usage interface (written
-by moving and sensing, read at every decision as the network's input), and
-entirely reactive, predictable dynamics (monotone accumulation and max-merge
---- it never acts on its own). It mediates agent--environment interaction
-(the drone acts on the world \emph{as represented by its map}, not on the
-raw world) and, through fusion, agent--agent interaction as well: the fused
-map is a coordination artefact in exactly the sense in which tuple spaces
-and blackboards are \citep{gelernter1985generative,omicini2008artifacts}.
-The same reading covers the \emph{distress beacon} (a single-function
-signalling artefact: a wreck is, in death, reduced to an artefact that
-manifests one fact to whoever passes) and the \emph{action mask} (a
-constraining artefact: it does not decide for the agent, it delimits the
-agent's option space --- artefacts enable and constrain in the same
-gesture).
+The clearest instance is the \emph{accumulated map}: a cognitive artefact with a
+definite function (aggregate spatial knowledge), a usage interface (written by
+moving and sensing, read at every decision as the network's input) and entirely
+reactive, predictable dynamics (monotone accumulation and max-merge --- it never
+acts on its own). It mediates agent--environment interaction, since the drone
+acts on the world \emph{as represented by its map}, and through fusion
+agent--agent interaction as well: the fused map is a coordination artefact in
+exactly the sense in which tuple spaces and blackboards are
+\citep{gelernter1985generative,omicini2008artifacts}. The same reading covers the
+\emph{distress beacon} --- a wreck is, in death, reduced to an artefact that
+manifests one fact to whoever passes --- and the \emph{action mask}, a
+constraining artefact that does not decide for the agent but delimits its option
+space, artefacts enabling and constraining in the same gesture.
 
-Two further observations sharpen the picture. First, artefacts are where
-the \emph{designer's} intelligence lives at runtime. The drones' policy is
-learned and opaque; the map semantics, the fusion rule, the mask, the reward
-machinery are designed and transparent. The system's verifiable properties
---- fusion never loses knowledge, masks never permit illegal moves, wrecks
-never block corridors --- are all artefact properties, which is reassuring
-exactly because artefact behaviour, unlike agent behaviour, is inspectable
-and predictable by construction \citep{omicini2008artifacts}. Second, the
-tooling of Section~\ref{subsec:arch-tooling} extends the same taxonomy to
-the humans in the loop: the GUI, the TensorBoard scalars, and the seeded
-evaluation harness are observation artefacts through which the
-\emph{engineer} perceives the MAS --- the instrumentation layer that makes
-an otherwise opaque adaptive system engineerable at all.
+Two observations sharpen the picture. Artefacts are where the \emph{designer's}
+intelligence lives at runtime: the policy is learned and opaque, while the map
+semantics, the fusion rule, the mask and the reward machinery are designed and
+transparent --- and the system's verifiable properties (fusion never loses
+knowledge, masks never permit illegal moves, wrecks never block corridors) are
+all artefact properties, inspectable and predictable by construction
+\citep{omicini2008artifacts}. And the tooling of
+Section~\ref{subsec:arch-tooling} extends the taxonomy to the humans in the loop:
+the GUI, the TensorBoard scalars and the seeded evaluation harness are
+observation artefacts through which the \emph{engineer} perceives the MAS --- the
+instrumentation layer that makes an otherwise opaque adaptive system engineerable
+at all.
 
 \subsection{Self-organisation and emergence}
 \label{subsec:mas-emergence}
@@ -376,20 +349,15 @@ propagates through fusion, collapsing the team's search into a pursuit.
 The balance of the two is exactly what the policy has had to learn.
 
 Two honest qualifications distinguish this from natural self-organisation.
-First, the organisation is \emph{trained into} the system: the attractors of
-the collective dynamics were shaped by fifty thousand episodes of
-gradient descent against a designer-chosen reward --- self-organisation at
-execution time, teleology at training time. Second, at the time of writing
-these team-level regularities have the status of \emph{design intent with
-partial quantitative support}. Coverage overlap between drones, inter-drone
-distance distributions over time, and post-fault re-covering latency are
-defined in Section~\ref{sec:experiments} precisely as the quantitative
-signatures of the emergence claimed here. Of these,
-Section~\ref{subsec:exp-qualitative} delivers the coverage-complementarity
-signature (low, and falling per-drone redundancy as the team grows); the two
-trajectory-level signatures are defined there but their measurement is left to
-future instrumentation, so the dispersion and re-covering claims rest for now
-on qualitative checkpoint inspection.
+First, the organisation is \emph{trained into} the system: the attractors of the
+collective dynamics were shaped by fifty thousand episodes of gradient descent
+against a designer-chosen reward --- self-organisation at execution time,
+teleology at training time. Second, these team-level regularities have the status
+of \emph{design intent with partial quantitative support}: of the three
+signatures defined as their empirical test,
+Section~\ref{subsec:exp-qualitative} delivers coverage complementarity and leaves
+the two trajectory-level ones (dispersion over time, post-fault re-covering
+latency) to future instrumentation.
 
 \subsection{Fault tolerance, openness, and resilience}
 \label{subsec:mas-resilience}
@@ -399,31 +367,27 @@ redundancy and decentralization; this project turns that slogan into a
 concrete, testable mechanism. Three layers of the design implement it.
 
 \paragraph{Structural redundancy.}
-Every drone is a complete, interchangeable searcher: same policy, same
-sensing model, same authority (none over the others). The task requires
-\emph{some} drone to reach the target, not any particular one --- so the
-system has no critical individual whose loss is qualitatively worse than
-another's. Combined with the environment-level guarantees that wrecks do
-not block corridors and that fault knowledge costs no reachability
-(Section~\ref{subsec:prob-fault}), any single survivor retains, in
-principle, the ability to complete the mission alone --- degraded in time,
-not in kind. This is the redundancy-based notion of robustness familiar
-from biological collectives \citep{camazine2001self}, engineered
-deliberately.
+Every drone is a complete, interchangeable searcher: same policy, same sensing
+model, same authority (none over the others). The task requires \emph{some} drone
+to reach the target, not any particular one, so no individual's loss is
+qualitatively worse than another's; combined with the environment-level
+guarantees that wrecks neither block corridors nor cost reachability
+(Section~\ref{subsec:prob-fault}), any single survivor retains in principle the
+ability to complete the mission alone --- degraded in time, not in kind. This is
+the redundancy-based robustness familiar from biological collectives
+\citep{camazine2001self}, engineered deliberately.
 
 \paragraph{A weak form of openness.}
 The team's composition changes at runtime: an episode that begins with four
-agents may end with one. In multi-agent terms the system is
-\emph{semi-open} --- departures occur unannounced, but no agent ever joins.
-Even this weak openness has real consequences: nothing in any drone's
-machinery assumes a fixed team size (the policy is explicitly conditioned
-on team size and believed alive count; per-agent structures are allocated
-per episode), and no drone's correct functioning depends on any other
-drone existing. The design would extend to arrivals (the context and fusion
-machinery are indifferent to \emph{which} drones exist), though the trained
-policy has never experienced them --- a gap between the architecture's
-openness and the policy's, worth noting because the two are easily
-conflated.
+agents may end with one. In multi-agent terms the system is \emph{semi-open} ---
+departures occur unannounced, but no agent ever joins. Even this weak openness has
+real consequences: nothing in any drone's machinery assumes a fixed team size
+(the policy is conditioned on team size and believed alive count, and per-agent
+structures are allocated per episode), and no drone's correct functioning depends
+on any other drone existing. The design would extend to arrivals, the context and
+fusion machinery being indifferent to \emph{which} drones exist, though the
+trained policy has never experienced them --- a gap between the architecture's
+openness and the policy's that is easily conflated.
 
 \paragraph{Epistemic decentralization: acting on belief, not knowledge.}
 The most distinctive layer is informational. As established in
@@ -469,36 +433,33 @@ spectrum matters twice: once for conceptual hygiene, and once because the
 placement determines which ethical questions Section~\ref{sec:ethics} must
 answer.
 
-The distinction that organizes the spectrum is between \emph{automatic}
-systems --- executing pre-specified stimulus-response rules, however
-elaborate --- and \emph{autonomous} ones, which select and adapt their own
-courses of action toward a goal under conditions their designers did not
-enumerate. The drones sit unambiguously on the autonomous side of that
-line: no trajectory, sweep pattern, or contingency table exists anywhere in
-the system; the mapping from situations to actions was learned, and it
-adapts online to circumstances --- team size, sensing regime, obstacle
-layout, teammate deaths --- that vary per episode and per turn. The
-BFS auto-navigation override of Section~\ref{subsec:arch-tooling} provides
-a clarifying foil: \emph{that} is an automatic component (a fixed,
-verifiable, pre-specified procedure), and the analysis of
-Section~\ref{sec:experiments} uses it precisely because its behaviour,
-unlike the policy's, is fully explainable.
+The distinction that organizes the spectrum is between \emph{automatic} systems
+--- executing pre-specified stimulus-response rules, however elaborate --- and
+\emph{autonomous} ones, which select and adapt their own courses of action toward
+a goal under conditions their designers did not enumerate. The drones sit
+unambiguously on the autonomous side: no trajectory, sweep pattern or contingency
+table exists anywhere in the system, the mapping from situations to actions was
+learned, and it adapts online to circumstances --- team size, sensing regime,
+obstacle layout, teammate deaths --- that vary per episode and per turn. The BFS
+auto-navigation override of Section~\ref{subsec:arch-tooling} is the clarifying
+foil: \emph{that} is an automatic component, a fixed and verifiable procedure,
+and Section~\ref{sec:experiments} uses it precisely because its behaviour, unlike
+the policy's, is fully explainable.
 
 Yet the drones' autonomy is strictly \emph{executive and operational}, not
-motivational. They choose their actions; they do not choose, weigh,
-reformulate, or abandon their goal. The objective was fixed by the
-designers --- half at design time in the reward function, half at training
-time in its distillation into values --- and no runtime process can revise
-it. In delegation terms \citep{dod2012autonomy}: the human specifies
-\emph{what} (find the target) and every constraint on \emph{how} (the
-reward's economy of time, collision, and coverage); the system autonomously
-resolves everything below that line, and nothing above it. Two boundary
-facts make the point concrete. The drones cannot refuse the mission or
-trade it off against anything --- there is nothing else in their value
-system. And the one capability that looks most like initiative ---
-re-planning the division of labour when the team shrinks --- is itself
-goal-subordinate adaptation, triggered by a belief update, in service of
-the same fixed objective.
+motivational. They choose their actions; they do not choose, weigh, reformulate
+or abandon their goal, which was fixed by the designers --- half at design time
+in the reward function, half at training time in its distillation into values ---
+with no runtime process able to revise it. In delegation terms
+\citep{dod2012autonomy}: the human specifies \emph{what} (find the target) and
+every constraint on \emph{how} (the reward's economy of time, collision and
+coverage); the system autonomously resolves everything below that line and
+nothing above it. Two boundary facts make the point concrete. The drones cannot
+refuse the mission or trade it off against anything --- there is nothing else in
+their value system --- and the capability that looks most like initiative,
+re-planning the division of labour when the team shrinks, is itself
+goal-subordinate adaptation triggered by a belief update, in service of the same
+fixed objective.
 
 This placement --- high operational autonomy, zero motivational autonomy,
 no runtime human in the loop, opaque learned decision function --- is
@@ -510,79 +471,38 @@ agent. Section~\ref{sec:ethics} takes up precisely this configuration.
 \subsection{Learning in the multi-agent system}
 \label{subsec:mas-learning}
 
-The learning design instantiates, and in places deliberately sidesteps, the
-canonical difficulties of multi-agent reinforcement learning reviewed in
-Section~\ref{subsec:bg-marl}. This subsection makes the mapping explicit.
-
-\paragraph{The game being solved.}
-The formal object is the identical-interest partially observable Markov
-game of Section~\ref{subsec:prob-model} --- cooperative in
-\citet{littman1994markov}'s taxonomy, Dec-POMDP-hard in the worst case
-\citep{bernstein2002complexity} --- approached, as complexity dictates, not
-by planning but by learning a reactive policy over engineered belief
-surrogates (the accumulated maps, Section~\ref{subsec:prob-obs}).
-
-\paragraph{Where it sits on the CTDE spectrum.}
-Parameter sharing \citep{gupta2017cooperative} places the design at a
-specific point of the centralized-training/decentralized-execution
-continuum \citep{kraemer2016multi,lowe2017multi}: training-time
-centralization consists \emph{only} of pooling experience into one replay
-buffer and one set of weights --- there is no centralized critic, no access
-to teammates' observations or actions, no global state anywhere in the
-loss. Every transition that trains the network is something some individual
-drone actually experienced. Execution is correspondingly clean: the batched
-action selection of Section~\ref{subsec:arch-learning} is a wall-clock
-optimization with no informational content --- each row of the batch is one
-drone's private inputs, and removing the batching changes nothing but
-speed. The deployment artifact is a fully decentralized policy in the
-strictest sense.
-
-\paragraph{Non-stationarity, softened twice.}
-The classical failure mode of independent learners --- each agent chasing
-an environment that drifts as the \emph{others} learn
-\citep{tan1993multi,hernandezleal2019survey} --- is softened here by two
-structural choices. Sharing removes \emph{divergence} between teammates:
-there are no separately-evolving policies to chase, since everyone updates
-in lock-step by construction. And the domain randomization over team size
-helps from an unexpected angle: the same network must function as the
-\emph{entire} team at $\nagents{=}1$ and as one-fourth of it at
-$\nagents{=}4$, which anchors its value estimates to the task itself rather
-than to the transient habits of specific co-learners. What sharing does
-\emph{not} remove is the subtler moving-target problem --- each drone's
-optimal behaviour still depends on teammates' current (shared, but
-evolving) behaviour --- and here the design simply accepts the standard
-empirical wager of parameter-shared MARL: that co-evolution of one policy
-converges more gracefully than co-evolution of $\nagents$.
-
-\paragraph{Symmetry, credit, and scale.}
-Three remaining MARL classics each map onto one design element. The
-\emph{symmetry problem} of shared policies --- identical inputs produce
-identical outputs, catastrophic at a shared spawn --- is solved by the
-identity entry of the context vector, as analysed in
-Section~\ref{subsec:mas-coordination}. \emph{Credit assignment} is handled
-by composition: dense individually-attributable shaping (each drone's
-exploration, revisit, and collision terms are computed from its own
-transitions) carries the bulk of learning, while the shared terminal bonus
---- granted retroactively, and only to drones alive at the find
-(Section~\ref{subsec:train-correctness}) --- aligns everyone's values with
-the team outcome without inviting dead free-riders. \emph{Scalability} is
-addressed by never materializing the joint anything: sequential execution
-plus per-drone argmax means the joint action space (whose exponential
-growth motivates much of the MARL literature,
-Section~\ref{subsec:bg-marl}) simply never appears; team size enters as a
-conditioning scalar, not as a dimensionality.
+Parameter sharing \citep{gupta2017cooperative} places this design at a specific
+point of the CTDE continuum
+\citep{kraemer2016multi,lowe2017multi}: training-time centralization consists
+\emph{only} of pooling experience into one replay buffer and one set of weights
+--- no centralized critic, no access to teammates' observations or actions, no
+global state anywhere in the loss. Every transition that trains the network is
+something some individual drone actually experienced, and execution is
+correspondingly clean, since the batched action selection of
+Section~\ref{subsec:arch-learning} is a wall-clock optimization with no
+informational content. The deployment artifact is a fully decentralized policy in
+the strictest sense. The same choice disposes of two MARL classics at once:
+the \emph{symmetry} of a shared policy at a shared spawn is broken by the
+identity entry of the context vector (Section~\ref{subsec:mas-coordination}),
+and \emph{scalability} follows from never materializing the joint anything ---
+sequential execution plus per-drone argmax means the joint action space whose
+exponential growth motivates much of the literature simply never appears, team
+size entering as a conditioning scalar rather than a dimensionality. What sharing
+does \emph{not} remove is the moving-target problem --- each drone's optimal
+behaviour still depends on teammates' evolving behaviour --- and here the design
+accepts the standard empirical wager of parameter-shared MARL: that co-evolution
+of one policy converges more gracefully than co-evolution of $\nagents$.
 
 \paragraph{The platform as a multi-agent laboratory.}
-A final identity shift is worth recording: the same artifact that trains
-the policy is, unchanged, an agent-based simulation platform
+A final identity shift is worth recording: the same artifact that trains the
+policy is, unchanged, an agent-based simulation platform
 \citep{bonabeau2002agent} --- a micro-level model whose macro-behaviour is
-studied by controlled manipulation. The seeded, parameterized evaluation
-harness (Section~\ref{subsec:arch-tooling}) is methodologically identical
-to a simulation experiment design: hold the population of instances fixed,
-vary one factor ($\pfault$, $\rcomm$, team size), and measure macro-level
-responses --- success, time, coverage, overlap. Section~\ref{sec:experiments}
-is, in this reading, an agent-based ``what-if'' study of the trained
-collective: what happens to a searching society as its members become
+studied by controlled manipulation. The seeded, parameterized evaluation harness
+(Section~\ref{subsec:arch-tooling}) is methodologically identical to a simulation
+experiment design: hold the population of instances fixed, vary one factor
+($\pfault$, $\rcomm$, team size), and measure macro-level responses. In this
+reading Section~\ref{sec:experiments} is an agent-based ``what-if'' study of the
+trained collective: what happens to a searching society as its members become
 mortal.
 
 \subsection{What a richer multi-agent design would add}
@@ -593,41 +513,36 @@ analysis above should not read as a claim that minimal is optimal. It is
 worth stating what each classical layer this design omits would offer ---
 and what it would cost --- both as intellectual honesty and as a roadmap.
 
-\emph{Explicit communication protocols}
-\citep{finin1994kqml} would let drones exchange intentions rather than
-facts --- ``I will sweep the north-east quadrant'' --- enabling explicit
-task allocation, and with it verifiable non-overlap guarantees instead of
-statistically-learned dispersion. The cost is the machinery the current
-design conspicuously avoids: message semantics, conversation state,
-commitment handling, and robustness of all of it to the death of either
-conversation partner mid-protocol --- a non-trivial concern in precisely
-this problem.
+\emph{Explicit communication protocols} \citep{finin1994kqml} would let drones
+exchange intentions rather than facts --- ``I will sweep the north-east quadrant''
+--- enabling explicit task allocation and with it verifiable non-overlap
+guarantees instead of statistically-learned dispersion. The cost is the machinery
+this design conspicuously avoids: message semantics, conversation state,
+commitment handling, and the robustness of all of it to the death of either
+partner mid-protocol --- a non-trivial concern in precisely this problem.
 
-\emph{Deliberative architectures} \citep{rao1995bdi} would make the drones'
-goals and plans explicit and inspectable. The gain is not primarily
-performance but \emph{explainability}: a belief--desire--intention drone
-can answer ``why did you go north?'' with an intention trace, where the
-present drone can answer only with a Q-value --- a difference whose ethical
-weight Section~\ref{subsec:eth-responsibility} makes precise. The cost is
-the classical one: hand-authored plan libraries in a domain whose main
-difficulty --- coverage under stochastic faults across randomized regimes
---- is exactly what resists concise symbolic specification.
+\emph{Deliberative architectures} \citep{rao1995bdi} would make goals and plans
+explicit and inspectable. The gain is not primarily performance but
+\emph{explainability}: a belief--desire--intention drone answers ``why did you go
+north?'' with an intention trace, where the present drone can answer only with a
+Q-value --- a difference whose ethical weight
+Section~\ref{subsec:eth-responsibility} makes precise. The cost is the classical
+one: hand-authored plan libraries in a domain whose main difficulty is exactly
+what resists concise symbolic specification.
 
-\emph{Organisational structure} --- roles, formations, an explicit division
-of the map --- would replace learned conventions with designed ones,
-gaining predictability and losing the seamless re-adaptation that makes the
-fault response work: a role structure must be re-formed when its occupants
-die, whereas the learned convention degrades continuously with
-$\hat n_i$.
+\emph{Organisational structure} --- roles, formations, an explicit division of
+the map --- would replace learned conventions with designed ones, gaining
+predictability and losing the seamless re-adaptation that makes the fault
+response work: a role structure must be re-formed when its occupants die, whereas
+the learned convention degrades continuously with $\hat n_i$.
 
 \emph{Programmable coordination media}
-\citep{gelernter1985generative,omicini2001tuple} offer perhaps the most
-natural upgrade path, because the system already has a coordination medium
-(the fused map) with a fixed policy (max-merge). Making the medium
-programmable --- a fusion rule that could, say, age knowledge, prioritize
-target and crash information under bandwidth limits, or maintain
-provenance --- would relocate coordination intelligence from the opaque
-policy into an inspectable artefact, the move the artefact literature
+\citep{gelernter1985generative,omicini2001tuple} offer perhaps the most natural
+upgrade path, since the system already has a coordination medium (the fused map)
+with a fixed policy (max-merge). Making that medium programmable --- a fusion rule
+that could age knowledge, prioritize target and crash information under bandwidth
+limits, or maintain provenance --- would relocate coordination intelligence from
+the opaque policy into an inspectable artefact, the move the artefact literature
 explicitly recommends \citep{omicini2008artifacts}.
 
 The common thread is a single trade-off, and it is the honest summary of

@@ -1,364 +1,282 @@
 \section{Ethical and Regulatory Analysis}
 \label{sec:ethics}
 
-A grid-world simulation processes no personal data, harms no one, and needs
-no licence. The analysis of this section is therefore explicitly
-\emph{prospective}: it asks what would follow --- ethically and legally ---
-if the capability this project prototypes were embodied in real aircraft
-over real terrain. The exercise is not hypothetical hand-wringing. The task
-specification of Section~\ref{sec:problem} --- find a hidden target in
-minimum time, under partial observability, with a team resilient to
-attrition --- is the abstract core of application profiles that range from
-the unambiguously beneficial to the gravest imaginable, and the technical
-analysis of Section~\ref{sec:mas} (in particular the autonomy placement of
-Section~\ref{subsec:mas-autonomy} and the opacity trade-off of
-Section~\ref{subsec:mas-beyond}) supplies exactly the vocabulary the
-ethical questions are posed in. We proceed from the dual-use diagnosis
-(Section~\ref{subsec:eth-dualuse}), through the two European regulatory
-frameworks that would govern civilian deployments --- data protection
-(Section~\ref{subsec:eth-gdpr}) and the AI Act
-(Section~\ref{subsec:eth-aiact}) --- to the military scenario that escapes
-both (Section~\ref{subsec:eth-laws}), the responsibility problem that
-underlies all of it (Section~\ref{subsec:eth-responsibility}), and a set of
-concrete design commitments (Section~\ref{subsec:eth-recommendations}).
+A grid-world simulation processes no personal data, harms no one, and needs no
+licence. The analysis of this section is therefore explicitly
+\emph{prospective}: it asks what would follow --- ethically and legally --- if
+the capability this project prototypes were embodied in real aircraft over real
+terrain. The exercise is not hypothetical hand-wringing. The task specification
+of Section~\ref{sec:problem} --- find a hidden target in minimum time, under
+partial observability, with a team resilient to attrition --- is the abstract
+core of application profiles ranging from the unambiguously beneficial to the
+gravest imaginable, and the technical analysis of Section~\ref{sec:mas} --- in
+particular the autonomy placement of Section~\ref{subsec:mas-autonomy} and the
+opacity trade-off of Section~\ref{subsec:mas-beyond} --- supplies exactly the
+vocabulary in which the ethical questions are posed. We proceed from the dual-use
+diagnosis, through the two European frameworks that would govern civilian
+deployments, to the military scenario that escapes both, the responsibility
+problem underlying all of it, and a set of concrete design commitments.
 
 \subsection{A dual-use capability}
 \label{subsec:eth-dualuse}
 
-Nothing in this system knows what its target \emph{is}. The environment
-marks one cell; the policy learns to reach it quickly. Instantiate the
-target as a missing hiker and the system is a search-and-rescue asset
-\citep{queralta2020collaborative}; as a wildfire front, an environmental
-monitor \citep{julian2019distributed}; as a person of interest, a
-surveillance tool; as a military objective whose localization triggers
-engagement, a component of a weapon system. The capability is
-deployment-agnostic by construction --- and that is the precise sense in
-which it is \emph{dual-use}: the same artifact serves civilian and military
-ends without modification, the classification hinging entirely on context
-of use.
+Nothing in this system knows what its target \emph{is}. The environment marks
+one cell; the policy learns to reach it quickly. Instantiate the target as a
+missing hiker and the system is a search-and-rescue asset
+\citep{queralta2020collaborative}; as a wildfire front, an environmental monitor
+\citep{julian2019distributed}; as a person of interest, a surveillance tool; as
+a military objective whose localization triggers engagement, a component of a
+weapon system. The capability is deployment-agnostic by construction --- the
+precise sense in which it is \emph{dual-use}: the same artifact serves civilian
+and military ends without modification, the classification hinging entirely on
+context of use.
 
-Two features of this particular design sharpen the point beyond the generic
-observation that search generalizes. First, the project's central technical
-contribution --- fault tolerance through redundancy, decentralized fault
-knowledge, and graceful degradation (Section~\ref{subsec:mas-resilience})
---- is exactly the property that makes a hostile swarm hard to defeat:
-resilience to random attrition and resilience to defensive fire are the
-same competence under different descriptions. Second, the single-policy
-generalization across team sizes, sensing ranges, and communication regimes
-(Section~\ref{subsec:train-dr}) is, read adversarially, robustness of the
-threat across countermeasure conditions. One cannot celebrate these
-properties in Section~\ref{sec:mas} and disown them here; the designer of a
-capability owns its profile of uses, and the honest response is not denial
-but analysis --- which uses are governed by what rules, where the rules run
-out, and what the designer can do unilaterally
+What sharpens the point beyond the generic observation that search generalizes
+is that this project's two central technical results are, read adversarially,
+threat properties. Fault tolerance through redundancy and decentralized fault
+knowledge (Section~\ref{subsec:mas-resilience}) is exactly what makes a hostile
+swarm hard to defeat --- resilience to random attrition and resilience to
+defensive fire are the same competence under different descriptions --- and
+single-policy generalization across team sizes, sensing and communication
+regimes (Section~\ref{subsec:train-dr}) is robustness of the threat across
+countermeasure conditions. One cannot celebrate these properties in
+Section~\ref{sec:mas} and disown them here; the honest response is not denial
+but analysis --- which uses are governed by what rules, where the rules run out,
+and what the designer can do unilaterally
 (Section~\ref{subsec:eth-recommendations}).
 
 \subsection{Data protection: the GDPR lens}
 \label{subsec:eth-gdpr}
 
-Consider first the benign deployment: drones searching for missing persons
-or assessing disaster zones over inhabited areas. Real perception is not an
-oracle bit but cameras and sensors over public and private space, and
-aerial imagery of identifiable individuals is personal data; its processing
-falls squarely under the General Data Protection Regulation
-\citep{gdpr2016} --- or, when the operator is a law-enforcement authority
-acting in that capacity, under its sibling instrument for police
-processing, Directive (EU) 2016/680. Four consequences of the GDPR's
-architecture bear directly on a drone-search deployment.
+Consider first the benign deployment: drones searching for missing persons over
+inhabited areas. Real perception is not an oracle bit but cameras and sensors
+over public and private space, and aerial imagery of identifiable individuals is
+personal data, so processing falls under the General Data Protection Regulation
+\citep{gdpr2016} --- or, for law-enforcement authorities acting as such, under
+Directive (EU) 2016/680. Consent is structurally unavailable, so processing must
+rest on another Article~6 basis (vital interests for rescue, public task for
+civil protection) under the discipline of purpose limitation --- and
+\emph{mission creep} is not an abstract worry for a system whose fused maps
+accumulate, by design, everything any team member has ever seen
+(Section~\ref{subsec:prob-comm}). At that scale, a multi-drone sweep of an
+inhabited area is also a textbook trigger for a mandatory data protection impact
+assessment (Article~35(3)(c)).
 
-\emph{Lawful basis and purpose limitation.} Consent is structurally
-unavailable --- one cannot consent whoever happens to be under the flight
-path --- so processing must rest on another Article~6 basis: protection of
-vital interests fits the rescue scenario, public task fits civil
-protection. The decisive discipline is purpose limitation: data collected
-to find a missing person may not drift into general surveillance of
-whoever else was observed --- \emph{mission creep} is not an abstract worry
-for a system whose fused maps accumulate, by design, everything any team
-member has ever seen (Section~\ref{subsec:prob-comm}).
-
-\emph{Minimisation --- and an argument this architecture supplies.} The
-GDPR requires that processing be limited to what the purpose necessitates.
-Here the system's own abstraction makes a concrete privacy argument: every
-mechanism of Sections~\ref{sec:problem}--\ref{sec:architecture} ---
-coordination, fusion, dispersion, fault handling --- consumes only
-\emph{occupancy-level} information (free, obstacle, target, crash site).
-Nothing in the coordination layer needs imagery, identity, or appearance.
-A privacy-respecting embodiment would therefore process raw sensor data
-on-board, transiently, solely to update the occupancy and detection maps,
-and share \emph{only those maps} between drones and with operators ---
-data-protection-by-design in the sense of Article~25, implemented as an
-architectural boundary between a perception layer (privacy-critical,
-on-board, ephemeral) and the coordination layer this report describes
-(abstract, shareable). The gap between what the swarm \emph{could} record
-and what its task \emph{needs} is exactly the space the minimisation
-principle demands be closed.
-
-\emph{Impact assessment and accountability.} Systematic monitoring of
-publicly accessible areas on a large scale triggers a mandatory data
-protection impact assessment (Article~35(3)(c)) --- a multi-drone sweep of
-an inhabited search area is a textbook instance. And the decentralized
-architecture raises a non-trivial accountability question: the deploying
-organization is plainly the controller, but the processing itself is
+The architecture does, however, supply its own minimisation argument, and it is
+the strongest ethical point this design can make. Every mechanism of
+Sections~\ref{sec:problem}--\ref{sec:architecture} --- coordination, fusion,
+dispersion, fault handling --- consumes only \emph{occupancy-level} information:
+free, obstacle, target, crash site. Nothing in the coordination layer needs
+imagery, identity, or appearance. A privacy-respecting embodiment would
+therefore process raw sensor data on-board, transiently, solely to update the
+occupancy and detection maps, and share \emph{only those maps} between drones
+and with operators --- data-protection-by-design in the sense of Article~25,
+implemented as an architectural boundary between a perception layer
+(privacy-critical, on-board, ephemeral) and the coordination layer this report
+describes (abstract, shareable). The gap between what the swarm \emph{could}
+record and what its task \emph{needs} is exactly the space minimisation demands
+be closed. The decentralization cuts the other way for accountability, though:
+the deploying organization is plainly the controller, but processing is
 replicated across autonomous nodes whose knowledge states synchronize
-opportunistically (Section~\ref{subsec:prob-comm}) --- every drone is a
-processing location, retention must be enforced on every replica, and a
-data-subject request must reach state that was fused, anonymously, into
-multiple maps. The anonymity of fusion --- a coordination virtue in
-Section~\ref{subsec:mas-coordination} --- becomes a governance burden the
-moment the fused content is personal data: provenance-free knowledge
-cannot be selectively erased.
+opportunistically, so retention must be enforced on every replica and an erasure
+request must reach state that was fused, anonymously, into multiple maps. The
+anonymity of fusion --- a coordination virtue in
+Section~\ref{subsec:mas-coordination} --- becomes a governance burden the moment
+the fused content is personal data: provenance-free knowledge cannot be
+selectively erased.
 
 \subsection{The EU AI Act}
 \label{subsec:eth-aiact}
 
 The AI Act \citep{aiact2024} governs AI systems by risk tier: prohibited
-practices, high-risk systems subject to ex-ante requirements, and
-lighter transparency regimes below. A learned multi-drone search policy is
-unambiguously an AI system in the Act's sense; \emph{which} tier it
-occupies depends, once again, on deployment.
+practices, high-risk systems subject to ex-ante requirements, and lighter
+transparency regimes below. A learned multi-drone search policy is unambiguously
+an AI system in the Act's sense; \emph{which} tier it occupies depends, once
+again, on deployment. Used by or on behalf of public authorities to locate
+persons in a law-enforcement context it falls within the high-risk categories of
+Annex~III (law enforcement; similarly migration and border management), and as a
+safety component of critical-infrastructure inspection, high-risk again. If the
+target is a \emph{person} and localization proceeds by identifying individuals
+from sensor data, the system approaches remote biometric identification, whose
+real-time use in publicly accessible spaces for law enforcement is prohibited
+outright (Article~5) save for narrowly enumerated exceptions --- which,
+notably, include the \emph{targeted search for missing persons}: the drafters
+anticipated precisely the benign reading of this capability and carved it out,
+subject to authorization and safeguards. A civilian system of this kind should
+therefore be engineered from the start to the high-risk compliance envelope.
 
-\emph{Where civilian deployments land.} Used by or on behalf of public
-authorities for locating persons in a law-enforcement context, the system
-falls within the high-risk categories of Annex~III (law enforcement;
-similarly migration and border management); deployed as a safety component
-of critical infrastructure inspection, high-risk again. If the search
-target is a \emph{person} and localization proceeds by identifying
-individuals from sensor data, the system approaches remote biometric
-identification --- whose real-time use in publicly accessible spaces for
-law enforcement is prohibited outright (Article~5), save for narrowly
-enumerated exceptions which, notably, include the \emph{targeted search
-for missing persons}: the Act's drafters anticipated precisely the benign
-reading of this capability and carved it out, subject to authorization and
-safeguards. A civilian search system of this kind should therefore be
-engineered, from the start, to the high-risk compliance envelope.
+Two of those obligations map onto this project sharply enough to be worth
+stating. Human oversight (Article~14) is the widest gap: the system as built has
+\emph{no runtime human role whatsoever} (Section~\ref{subsec:mas-autonomy}), so
+an oversight interface --- monitoring, intervention, override --- would have to
+be added, not merely documented. Accuracy and robustness (Article~15) is the
+article the project speaks to most directly: the fault-robustness and
+generalization evaluations of Section~\ref{sec:experiments} are, in substance,
+Article~15 evidence, while their statistical character --- performance over
+seeded samples, not guarantees --- marks the boundary of what such evidence can
+establish (Section~\ref{subsec:eth-responsibility}). The remaining chapters land where one would expect --- and one mapping is worth
+naming: for a policy trained entirely in simulation, data governance
+(Article~10) is a question about the randomization ranges of
+Section~\ref{subsec:train-dr}, whose limits
+(Section~\ref{subsec:exp-discussion}) are compliance gaps.
 
-\emph{What the high-risk obligations would demand.} The obligations of
-Chapter~III map onto this project's pipeline with almost uncomfortable
-precision, and the mapping is worth stating because it shows the distance
-between research code and deployable system. Risk management (Article~9)
-would formalize what Section~\ref{subsec:train-correctness} does
-informally. Data governance (Article~10) --- training data must be
-relevant and representative of the operating domain --- is, for a policy
-trained entirely in simulation, a question about the domain-randomization
-ranges of Section~\ref{subsec:train-dr}: DR coverage \emph{is} the data
-governance story, and its limits (Section~\ref{subsec:exp-discussion})
-are compliance gaps. Record-keeping (Article~12) demands runtime logging;
-the project's seeded reproducibility --- one seed regenerates layout,
-faults, and hence the full episode
-(Section~\ref{subsec:train-infra}) --- is a strong starting point that
-would need tamper-evident deployment logging on top. Human oversight
-(Article~14) is the sharpest gap: the system as built has \emph{no
-runtime human role whatsoever} (Section~\ref{subsec:mas-autonomy}), so an
-oversight interface --- monitoring, intervention, override --- would have
-to be added, not merely documented. Accuracy and robustness (Article~15)
-is the article this project can speak to most directly: the
-fault-robustness and generalization evaluations of
-Section~\ref{sec:experiments} are, in substance, Article~15 evidence ---
-while their statistical character (performance over seeded samples, not
-guarantees) marks the boundary of what such evidence can establish
-(Section~\ref{subsec:eth-responsibility}).
-
-\emph{The military carve-out.} All of the above evaporates in the scenario
-the next subsection considers: Article~2(3) excludes from the Act's scope
-systems placed on the market or used \emph{exclusively for military,
-defence or national security purposes}. The European Union's flagship AI
-regulation, including its prohibited-practices tier, simply does not apply
-to a targeting swarm. The asymmetry deserves emphasis: the \emph{rescue}
-deployment of this capability faces DPIAs, conformity assessments, and
-oversight requirements; the \emph{lethal} deployment of the same
-capability faces, from EU AI law, nothing. What fills the gap is the older
-and thinner fabric of international humanitarian law and the slow-moving
-intergovernmental process around autonomous weapons --- the subject of the
-next subsection.
+\emph{The military carve-out.} All of the above evaporates in the scenario the
+next subsection considers: Article~2(3) excludes from the Act's scope systems
+placed on the market or used \emph{exclusively for military, defence or national
+security purposes}. The European Union's flagship AI regulation, including its
+prohibited-practices tier, simply does not apply to a targeting swarm. The
+asymmetry deserves emphasis: the \emph{rescue} deployment of this capability
+faces DPIAs, conformity assessments and oversight requirements; the
+\emph{lethal} deployment of the same capability faces, from EU AI law, nothing.
+What fills the gap is the older and thinner fabric of international humanitarian
+law and the slow-moving intergovernmental process around autonomous weapons.
 
 \subsection{The autonomous-weapons scenario}
 \label{subsec:eth-laws}
 
-Suppose, then, the ugly instantiation: the target is a military objective,
-and detection cues engagement --- by a human downstream, or by the system
-itself. In the latter case the assembly meets the standard definition of
-an autonomous weapon system: one that, once activated, selects and engages
-targets without further human intervention \citep{dod2012autonomy}. No
-dedicated treaty governs such systems; the governance landscape consists
-of international humanitarian law (IHL), the guiding principles affirmed
-by the CCW Group of Governmental Experts --- IHL applies fully to
-autonomous weapons, and human responsibility for their use cannot be
-transferred to the machine \citep{ccw2019guiding} --- and normative
-positions such as the ICRC's, which calls for ruling out unpredictable
-autonomous weapons and those targeting persons, and for strict
-constraints (geographic, temporal, situational, and of human supervision)
-on the rest \citep{icrc2021position,sharkey2019autonomous}. Against that
-landscape, the system described in this report would be an unacceptable
-weapon component --- and the reasons are not generic misgivings about
-``killer robots'' but specific, mechanistic properties established in the
-preceding sections.
+Suppose, then, the ugly instantiation: the target is a military objective and
+detection cues engagement --- by a human downstream, or by the system itself. In
+the latter case the assembly meets the standard definition of an autonomous
+weapon system: one that, once activated, selects and engages targets without
+further human intervention \citep{dod2012autonomy}. No dedicated treaty governs
+such systems; the landscape consists of international humanitarian law (IHL), the
+CCW Group of Governmental Experts' guiding principles --- IHL applies fully, and
+human responsibility cannot be transferred to the machine
+\citep{ccw2019guiding} --- and normative positions such as the ICRC's, calling
+for unpredictable autonomous weapons and those targeting persons to be ruled out
+and the rest strictly constrained
+\citep{icrc2021position,sharkey2019autonomous}. Against that landscape the system
+described here would be an unacceptable weapon component, for specific properties
+established in the preceding sections rather than generic misgivings about
+``killer robots''.
 
-\emph{Distinction fails at the architecture's core.} IHL's first demand is
-that attacks distinguish military objectives from civilians. The system's
-target representation is a binary, monotone memory bit: once any drone
-marks a cell as target, the mark persists, propagates through fusion to
-the whole connected team, and --- because fusion is an anonymous maximum
-with no provenance and no retraction
-(Section~\ref{subsec:prob-comm}) --- \emph{cannot be corrected}. A single
-false detection becomes, irreversibly, the entire team's truth; the very
-monotonicity that makes cooperative mapping conflict-free makes
-misidentification unrecallable. Add the belief staleness quantified in
-Section~\ref{subsec:mas-resilience} --- drones act for whole intervals on
-outdated pictures of the world --- and the mismatch with a legal standard
-that requires case-by-case verification \emph{at the moment of attack} is
-structural, not incidental.
+\emph{Distinction fails at the architecture's core.} The target representation is
+a binary, monotone memory bit: once any drone marks a cell as target the mark
+persists, propagates through fusion to the whole connected team, and --- fusion
+being an anonymous maximum with no provenance and no retraction
+(Section~\ref{subsec:prob-comm}) --- \emph{cannot be corrected}. A single false
+detection becomes, irreversibly, the entire team's truth: the very monotonicity
+that makes cooperative mapping conflict-free makes misidentification
+unrecallable. Add the belief staleness of Section~\ref{subsec:mas-resilience} and
+the mismatch with a legal standard requiring case-by-case verification \emph{at
+the moment of attack} is structural, not incidental.
 
-\emph{Proportionality has no substrate.} The proportionality rule requires
-weighing anticipated military advantage against expected incidental harm
---- a contextual, value-laden judgement. The policy's entire evaluative
-apparatus is a Q-function distilled from the reward of
-Table~\ref{tab:reward}: time, coverage, collision. There is no input
-channel through which civilian presence could even \emph{enter} the
-decision, let alone be weighed. This is the goal-oriented/goal-governed
-distinction of Section~\ref{subsec:mas-agents} bearing legal weight: a
-system whose objectives are distilled into weights cannot deliberate about
-competing considerations, because there is nothing in it that represents
-considerations at all.
+\emph{Proportionality has no substrate.} Weighing anticipated military advantage
+against expected incidental harm is a contextual, value-laden judgement, while
+the policy's entire evaluative apparatus is a Q-function distilled from the
+reward of Table~\ref{tab:reward}: time, coverage, collision. No input channel
+exists through which civilian presence could even \emph{enter} the decision. This
+is the goal-oriented/goal-governed distinction of
+Section~\ref{subsec:mas-agents} bearing legal weight: a system whose objectives
+are distilled into weights cannot deliberate about competing considerations,
+because nothing in it represents considerations at all.
 
-\emph{Precaution collides with emergence.} IHL requires those who plan
-attacks to take constant care and to cancel or suspend when circumstances
-change. But the team-level behaviour of this system is, by the analysis of
-Section~\ref{subsec:mas-emergence}, emergent: not specified anywhere,
-produced by the interaction of learned policies, shaped but not dictated
-by training. Meaningful human control --- in the influential analysis, the
-requirement that the system \emph{track} human moral reasons and that its
-conduct be \emph{traceable} to humans who understand it
-\citep{santonidesio2018meaningful} --- fails on both prongs: tracking,
-because the only ``reasons'' the system responds to are distilled search
-economics; tracing, because no human can inspect \emph{why} the collective
-did what it did (Section~\ref{subsec:eth-responsibility}). And the
-operational profile at issue --- communication-denied environments,
-exactly where autonomy is militarily attractive --- is the profile in
-which a human \emph{could not} supervise even in principle: the same
-range-limited communication that makes centralized control unimplementable
-(Section~\ref{subsec:mas-why}) makes real-time human oversight
-unimplementable too. The autonomy that solves the engineering problem is
-the autonomy that dissolves the control requirement.
-
-\emph{Generalization is not verification.} Finally, the system's
-robustness claims are statistical: performance across domain-randomized,
-seeded conditions (Section~\ref{sec:experiments}). An adversary is
-precisely an out-of-distribution generator --- jamming pushes the
-communication regime below anything trained, decoys exploit the
-irreversible target memory, spoofed beacons corrupt the belief layer this
-system trusts implicitly. Deploying against an adaptive opponent a policy
-whose guarantees are distributional is unpredictability by construction
---- the property the ICRC position singles out as grounds for
-prohibition \citep{icrc2021position}.
+\emph{Precaution collides with emergence, and generalization is not
+verification.} IHL requires those who plan attacks to take constant care and to
+suspend when circumstances change, but the team-level behaviour of this system is
+emergent (Section~\ref{subsec:mas-emergence}) --- shaped by training, specified
+nowhere. Meaningful human control, in the influential analysis the requirement
+that a system \emph{track} human moral reasons and that its conduct be
+\emph{traceable} to humans who understand it
+\citep{santonidesio2018meaningful}, fails on both prongs: the only ``reasons''
+the system responds to are distilled search economics, and no human can inspect
+\emph{why} the collective did what it did. Worse, the operational profile that
+makes autonomy militarily attractive --- communication-denied environments --- is
+the profile in which a human \emph{could not} supervise even in principle: the
+same range limits that make centralized control unimplementable
+(Section~\ref{subsec:mas-why}) make real-time oversight unimplementable too. And
+the robustness claims are statistical (Section~\ref{sec:experiments}), while an
+adversary is precisely an out-of-distribution generator --- jamming pushes
+communication below anything trained, decoys exploit the irreversible target
+memory, spoofed beacons corrupt the belief layer the system trusts implicitly.
+Deploying against an adaptive opponent a policy whose guarantees are
+distributional is unpredictability by construction --- the property the ICRC
+singles out as grounds for prohibition \citep{icrc2021position}.
 
 \subsection{Responsibility and opacity in self-organising systems}
 \label{subsec:eth-responsibility}
 
-Beneath both regulatory analyses lies one structural problem that this
-report's own technical sections make unusually crisp: \emph{where, in a
-system like this, is the seat of responsibility?} The classical conditions
-for responsibility --- knowledge and control --- are strained twice over.
+Beneath both regulatory analyses lies one structural problem that this report's
+technical sections make unusually crisp: \emph{where, in a system like this, is
+the seat of responsibility?} The classical conditions --- knowledge and control
+--- are strained twice over.
 
-They are strained \emph{vertically} by learning. The behaviour ultimately
-executed was produced by an optimization process; the designers chose the
-reward, the ranges, and the architecture, but nobody chose --- or can
-enumerate --- the policy's dispositions. This is the responsibility gap in
-its canonical form \citep{matthias2004responsibility}: the manufacturer's
-control ends where the learning begins, yet no one downstream gains the
-control the manufacturer lost. The system's opacity is not incidental
-polish that better documentation could remove: as
-Section~\ref{subsec:mas-beyond} argued, a Q-network answers ``why'' with a
-number, not a trace --- explainability was traded away, knowingly, for
-adaptivity, and with it went the evidential substrate that after-the-fact
-accountability (an investigation, an audit, a court) would need.
+They are strained \emph{vertically} by learning: the designers chose the reward,
+the ranges and the architecture, but nobody chose --- or can enumerate --- the
+policy's dispositions. This is the responsibility gap in its canonical form
+\citep{matthias2004responsibility}, the manufacturer's control ending where the
+learning begins without anyone downstream gaining the control the manufacturer
+lost; and the opacity is not incidental polish that better documentation could
+remove --- as Section~\ref{subsec:mas-beyond} argued, a Q-network answers ``why''
+with a number, not a trace, and with explainability went the evidential substrate
+that after-the-fact accountability would need.
 
-They are strained \emph{horizontally} by multi-agency. Outcomes here are
-produced by four interacting policies, an environment's mediation, and the
-accidents of who fused with whom when
-(Section~\ref{subsec:mas-coordination}); the emergent regularities of
-Section~\ref{subsec:mas-emergence} belong to no drone. Moral philosophy
-knows this as the problem of many hands; this system exhibits its purest
-technical form, since the ``hands'' are homogeneous, anonymous, and
-individually thoughtless. When an emergent behaviour causes harm, the
-candidate bearers of responsibility --- operator, commander, integrator,
-policy trainer, reward designer --- each stand at a defensible distance
-from the outcome, and the CCW principle that responsibility cannot pass to
-the machine \citep{ccw2019guiding} names the constraint without resolving
-the allocation.
-
-Product-liability law patches part of the civil-damages corner of this
-problem --- the revised EU directive extends strict liability for
-defective products explicitly to software and AI systems, and to defects
-arising from post-deployment learning \citep{pld2024} --- but liability
-for compensation is the \emph{floor}, not the substance, of
-accountability. What remains, and what
-Section~\ref{subsec:eth-recommendations} operationalizes, is a design
-obligation: if responsibility is to be attributable at all, the system
-must be built so that human decisions remain the tracable causes of its
-consequential actions --- responsibility-by-design as the governance
+They are strained \emph{horizontally} by multi-agency. Outcomes are produced by
+several interacting policies, an environment's mediation and the accidents of who
+fused with whom when, and the emergent regularities of
+Section~\ref{subsec:mas-emergence} belong to no drone. Moral philosophy knows
+this as the problem of many hands, of which this system exhibits the purest
+technical form, the ``hands'' being homogeneous, anonymous and individually
+thoughtless: when an emergent behaviour causes harm, operator, commander,
+integrator, policy trainer and reward designer each stand at a defensible
+distance from the outcome, and the CCW principle that responsibility cannot pass
+to the machine \citep{ccw2019guiding} names the constraint without resolving the
+allocation. Product-liability law patches the civil-damages corner --- the revised
+EU directive extends strict liability to software and AI systems, including
+defects arising from post-deployment learning \citep{pld2024} --- but
+compensation is the \emph{floor}, not the substance, of accountability. What
+remains is a design obligation: if responsibility is to be attributable at all,
+the system must be built so that human decisions remain the traceable causes of
+its consequential actions --- responsibility-by-design as the governance
 counterpart of privacy-by-design.
 
 \subsection{Design recommendations}
 \label{subsec:eth-recommendations}
 
-The analysis above is not merely critical; it implies a concrete design
-posture, most of it implementable unilaterally by the developer. Stated as
-commitments for any real embodiment of this work:
+The analysis implies a concrete design posture, most of it implementable
+unilaterally by the developer. Stated as commitments for any real embodiment:
 
-\begin{itemize}[leftmargin=1.5em]
-  \item \textbf{Detection, never engagement.} The system's output boundary
-    is a \emph{location report to a human}; no actuator capable of harm is
-    ever placed downstream of the policy. This single architectural
-    commitment removes the system from the autonomous-weapon category by
-    construction and preserves the human judgement that
-    Section~\ref{subsec:eth-laws} showed the policy cannot supply.
-  \item \textbf{A human on the loop, with real authority.} For any
-    consequential downstream action, a human confirms on the basis of
-    \emph{raw evidence} (imagery), not the system's binary target bit ---
-    directly countering the irreversible-belief failure mode --- with
-    abort authority whose availability is treated as a mission constraint:
-    where communication denial would sever oversight, the mission profile,
-    not the oversight, is what yields (cf.\ Article~14 of the AI Act).
-  \item \textbf{Hard mission envelopes.} Geofencing, mission duration
-    bounds, and target-class restrictions enforced \emph{outside} the
-    learned component --- as environment-level constraints in the sense of
-    Section~\ref{subsec:mas-environment}, whose compliance is verifiable
-    by construction precisely because they are artefacts, not policies
-    (Section~\ref{subsec:mas-artefacts}). This is the ICRC's
-    constraint-based prescription \citep{icrc2021position} translated into
-    this system's architecture.
+\begin{itemize}[leftmargin=1.5em,itemsep=1pt]
+  \item \textbf{Detection, never engagement.} The output boundary is a
+    \emph{location report to a human}, with no actuator capable of harm ever
+    placed downstream of the policy: this single commitment removes the system
+    from the autonomous-weapon category by construction and preserves the human
+    judgement Section~\ref{subsec:eth-laws} showed the policy cannot supply.
+  \item \textbf{A human on the loop, with real authority.} Consequential action
+    requires human confirmation on \emph{raw evidence} (imagery), not the
+    system's binary target bit --- countering the irreversible-belief failure
+    mode --- with abort authority treated as a mission constraint: where
+    communication denial would sever oversight, the mission profile, not the
+    oversight, is what yields (cf.\ Article~14).
+  \item \textbf{Hard mission envelopes, staged autonomy.} Geofencing, duration
+    bounds and target-class restrictions enforced \emph{outside} the learned
+    component, as environment-level artefacts
+    (Sections~\ref{subsec:mas-environment} and~\ref{subsec:mas-artefacts}) whose
+    compliance is verifiable by construction --- the ICRC's constraint-based
+    prescription \citep{icrc2021position} in this architecture --- with
+    deployment graduating through supervised autonomy levels
+    \citep{sae2021j3016,dod2012autonomy}, promotion gated on the evidence of
+    Section~\ref{sec:experiments} and on its honest limits.
   \item \textbf{Retraction-capable knowledge.} Replace the monotone target
     memory with a revisable representation (confidence-weighted, decaying,
-    provenance-carrying), so that a false detection can be corrected and
-    an erasure request honoured --- fixing in one stroke the
-    distinction-critical failure of Section~\ref{subsec:eth-laws} and the
-    erasure problem of Section~\ref{subsec:eth-gdpr}. Notably, this is a
-    coordination-medium upgrade of exactly the kind
+    provenance-carrying), so a false detection can be corrected and an erasure
+    request honoured --- fixing in one stroke the distinction-critical failure of
+    Section~\ref{subsec:eth-laws} and the erasure problem of
+    Section~\ref{subsec:eth-gdpr}, as the coordination-medium upgrade
     Section~\ref{subsec:mas-beyond} recommended on engineering grounds.
-  \item \textbf{Privacy-preserving perception.} On-board, ephemeral
-    processing of raw sensing; only occupancy-level abstractions are
-    stored, fused, or transmitted (Section~\ref{subsec:eth-gdpr}); imagery
-    retention only upon human-confirmed detection, under the deployment's
-    lawful basis.
-  \item \textbf{Tamper-evident accountability logging.} Extend the seeded
-    reproducibility of Section~\ref{subsec:train-infra} into deployment:
-    signed logs of observations, beliefs, fusion events, and actions,
-    sufficient to reconstruct \emph{what each drone knew and when} --- the
-    minimal evidential basis Section~\ref{subsec:eth-responsibility} found
+  \item \textbf{Privacy-preserving perception and tamper-evident logging.}
+    On-board, ephemeral processing of raw sensing, only occupancy-level
+    abstractions stored, fused or transmitted, imagery retained solely on
+    human-confirmed detection; and signed logs of observations, beliefs, fusion
+    events and actions, sufficient to reconstruct \emph{what each drone knew and
+    when} --- the evidential basis Section~\ref{subsec:eth-responsibility} found
     missing.
-  \item \textbf{Staged autonomy with demonstrated competence.} Deployment
-    graduates through supervised levels (teleoperated, supervised
-    autonomous, autonomous-within-envelope) in the manner of the
-    established autonomy-level frameworks
-    \citep{sae2021j3016,dod2012autonomy}, with promotion gated on the
-    quantitative evidence of Section~\ref{sec:experiments} --- and on its
-    honest limits.
 \end{itemize}
 
 None of this dissolves the dual-use character diagnosed in
-Section~\ref{subsec:eth-dualuse} --- no design measure can prevent a
-determined actor from rebuilding the capability without the safeguards.
-What the measures achieve is narrower and still worth having: they make
-the \emph{artifact as shipped} lawful in its intended deployments,
-auditable when it fails, and useless as a weapon without substantial,
-deliberate, and therefore attributable modification.
+Section~\ref{subsec:eth-dualuse}: no design measure can prevent a determined
+actor from rebuilding the capability without the safeguards. What the measures
+achieve is narrower and still worth having --- they make the \emph{artifact as
+shipped} lawful in its intended deployments, auditable when it fails, and
+useless as a weapon without substantial, deliberate, and therefore attributable
+modification.

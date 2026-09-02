@@ -4,130 +4,90 @@
 \subsection{Conclusions}
 \label{subsec:conc-conclusions}
 
-This project set out to build, analyse, and evaluate a cooperative
-multi-agent system for a deceptively simple task --- find a hidden target on a
-grid --- made genuinely hard by three coupled sources of uncertainty: partial
-observability, limited communication, and, as its defining extension, the
-possibility that any drone permanently breaks at any moment with no central
-authority to announce the loss. We summarize what was accomplished along the
-three axes the report developed.
+This project set out to build, analyse, and evaluate a cooperative multi-agent
+system for a deceptively simple task --- find a hidden target on a grid --- made
+genuinely hard by three coupled sources of uncertainty: partial observability,
+limited communication, and, as its defining extension, the possibility that any
+drone permanently breaks at any moment with no central authority to announce the
+loss.
 
-\paragraph{What was built.}
-We implemented, from scratch, a configurable cooperative grid environment
-(Section~\ref{sec:architecture}) with sequential turn-based execution,
-accumulated per-drone knowledge maps, range-limited map fusion, and a
-decentralized fault model in which crash knowledge propagates only through a
-passive distress beacon and ordinary communication --- never a global oracle
-(Section~\ref{subsec:prob-fault}). A single Dueling Double DQN with parameter
-sharing (Section~\ref{subsec:arch-network}) drives every drone through one
-shared forward pass; per-episode domain randomization together with a compact
-context vector (Section~\ref{subsec:arch-context}) makes that one policy a
-generalist across team size, sensing, communication, clutter, and fault rate.
-The training methodology (Section~\ref{sec:training}) treated the fault model
-with the care value-based learning demands --- most consequentially, that a
-fault is a \emph{truncation}, not a terminal, so bad luck is never charged to
-the value function.
-
-\paragraph{What the multi-agent reading revealed.}
-Section~\ref{sec:mas} read the system through the vocabulary of the field and
-found that its most interesting properties are precisely the ones no line of
-code states directly. Coordination is achieved \emph{without} protocols,
-performatives, or a coordinator: dispersion from a shared spawn corner is
-driven by environment-mediated, stigmergic repulsion from swept regions; role
+\paragraph{What was built, and what the multi-agent reading revealed.}
+We implemented from scratch a cooperative grid environment
+(Section~\ref{sec:architecture}) with sequential execution, accumulated per-drone
+knowledge maps, range-limited fusion, and a decentralized fault model in which
+crash knowledge propagates only through a passive distress beacon and ordinary
+communication (Section~\ref{subsec:prob-fault}); a single Dueling Double DQN with
+parameter sharing drives every drone, and per-episode domain randomization with a
+compact context vector (Section~\ref{subsec:arch-context}) makes that one policy
+a generalist across team size, sensing, communication, clutter, and fault rate.
+Read through the vocabulary of the field (Section~\ref{sec:mas}), the system's
+most interesting properties turn out to be precisely the ones no line of code
+states directly. Coordination is achieved \emph{without} protocols,
+performatives, or a coordinator: dispersion from a shared spawn corner is driven
+by environment-mediated, stigmergic repulsion from swept regions; role
 differentiation among identical drones is broken open by a single identity
 scalar; and the ``knowledge'' each drone acts on is a first-order epistemic
-belief --- sound but possibly stale --- updated by observation and by
-testimony from teammates. The fault handling, in particular, is an epistemic
-story: graceful degradation is a system-level property that no individual
-drone implements, resting on redundancy and decentralization rather than on
-any drone knowing the true state of the team.
+belief --- sound but possibly stale --- updated by observation and by testimony
+from teammates. Graceful degradation, in particular, is a system-level property
+that no individual drone implements, resting on redundancy and epistemic
+decentralization rather than on any drone knowing the true state of the team.
 
-\paragraph{What the experiments showed.}
-The evaluation (Section~\ref{sec:experiments}) substantiated the central
-claims and bounded them honestly. A single policy generalized across every
-randomization axis, including \emph{beyond} its trained ranges on team size,
-vision, and communication --- driving teams of six drones it never trained on
-at over $90\%$ success. Most importantly, degradation under faults is
-\emph{graceful}: across the entire trained fault range success fell by under
-six points while the team shed, on average, more than half a drone, and even
-at a fault rate more than triple the trained maximum --- losing, on average,
-half the team per episode --- the system still completed two missions in
-three, with no cliff. The evaluation was equally clear about limits: obstacle
-density is the one axis whose extrapolation collapses; communication, on this
-task, refines coordination but does not create it (severing it costs almost
-nothing in find rate); and the emergent-coordination and belief-lag claims are
-only partially instrumented so far.
-
-\paragraph{What the ethical analysis concluded.}
-Section~\ref{sec:ethics} argued that the very capability studied here is
-irreducibly dual-use --- ``find a hidden target in minimum time'' is
-deployment-agnostic --- and that the fault tolerance which makes a
-search-and-rescue swarm robust is the same property that would make an attack
-swarm resilient. The analysis mapped the civilian system onto GDPR and the EU
-AI Act, and confronted the military carve-out (Art.~2(3)) that lets the war
-scenario escape the Act entirely, before arguing that \emph{this specific
-system} --- opaque, statistically rather than formally validated, acting on
-stale beliefs under partial observability, with no single decision locus ---
-would be unacceptable as an autonomous weapon on exactly the grounds its own
-evaluation exposes. The takeaway is not that the technology should not be
-built, but that its governance cannot be an afterthought to its engineering.
-
-Taken together, the contribution is a small but complete study: a working
-fault-tolerant cooperative system, a systematic multi-agent reading that
-grounds each abstract concept in a concrete mechanism, an experimental
-characterization of what the learned policy does and does not generalize, and
-an ethical analysis that takes the dual-use nature of the result seriously.
+\paragraph{What the experiments and the ethical analysis showed.}
+The evaluation (Section~\ref{sec:experiments}) substantiated the central claims
+and bounded them honestly. A single policy generalized across every randomization
+axis, including \emph{beyond} its trained ranges on team size, vision, and
+communication --- driving teams of six drones it never trained on at over $90\%$
+success. Most importantly, degradation under faults is \emph{graceful}: across
+the entire trained fault range success fell by under six points while the team
+shed, on average, more than half a drone, and even at a fault rate more than
+triple the trained maximum the system still completed two missions in three, with
+no cliff. The limits were equally clear: obstacle density is the one axis whose
+extrapolation collapses; communication, on this task, refines coordination but
+does not create it; and two of the three emergence signatures, together with the
+belief-lag question, remain defined but uninstrumented
+(Section~\ref{subsec:exp-discussion}). Section~\ref{sec:ethics} then argued that
+the capability is irreducibly dual-use --- the fault tolerance that makes a
+search-and-rescue swarm robust is what would make an attack swarm resilient ---
+mapped the civilian system onto the GDPR and the EU AI Act, confronted the
+military carve-out that lets the war scenario escape the Act entirely, and
+concluded that \emph{this specific system} --- opaque, statistically rather than
+formally validated, acting on stale beliefs, with no single decision locus ---
+would be unacceptable as an autonomous weapon, on exactly the grounds its own
+evaluation exposes. The takeaway is not that the technology should not be built,
+but that its governance cannot be an afterthought to its engineering.
 
 \subsection{Future work}
 \label{subsec:conc-future}
 
-The limitations of Section~\ref{subsec:exp-discussion} map onto a concrete
-agenda, which we group by how far it reaches from the present system.
-
-\paragraph{Completing the present evaluation.}
 Three measurements were defined in this report but not carried out, each for a
-mundane reason. The belief-lag question --- how communication range governs
-the interval between a fault and a survivor's discovery of it
-(Section~\ref{subsec:mas-resilience}) --- needs a joint fault$\times$comm
-sweep with per-step trajectory logging; the same logging would deliver the two
+mundane reason. The belief-lag question --- how communication range governs the
+interval between a fault and a survivor's discovery of it
+(Section~\ref{subsec:mas-resilience}) --- needs a joint fault$\times$comm sweep
+with per-step trajectory logging, and the same logging would deliver the two
 emergence signatures (inter-drone distance over time, post-fault re-covering
-latency) that Section~\ref{subsec:exp-qualitative} left qualitative. Two
-further ablations --- removing the believed-alive count from the context
-vector, and switching the shared terminal reward for an individual one ---
-require retraining a policy each. None of these changes the architecture; they
-are instrumentation and compute, and they would sharpen the claims already
-made.
+latency) that Section~\ref{subsec:exp-qualitative} left qualitative; two further
+ablations --- removing the believed-alive count from the context vector, and
+switching the shared terminal reward for an individual one --- require retraining
+a policy each. None of these changes the architecture: they are instrumentation
+and compute, and they would sharpen the claims already made.
 
-\paragraph{Richer coordination mechanisms.}
-The finding that communication contributes little on this task
-(Section~\ref{subsec:exp-ablations}) is partly a property of the task and
-partly of the design. Replacing fixed map fusion with \emph{learned} messages
---- a differentiable communication channel the policy optimizes end-to-end ---
-would let the system decide \emph{what} to share, and a task that genuinely
-rewarded information sharing (a target visible only from afar, heterogeneous
-sensors, or partial views that must be combined) would exercise that channel
-far harder than target-in-a-maze search does. On the credit-assignment side,
-value-decomposition methods (VDN/QMIX-style) would replace the shared-terminal
-heuristic of Section~\ref{subsec:train-correctness} with a learned
-factorization of team value into per-agent contributions.
-
-\paragraph{Beyond the accumulated-map belief state.}
-The hand-crafted knowledge maps that let a memoryless policy act in a
-partially observable world (Section~\ref{subsec:prob-obs}) could be replaced
-by a \emph{learned} memory --- a recurrent or attention-based encoder over the
-observation history --- which would remove the assumption that a spatial
-summary is a sufficient statistic and might capture temporal structure the
-maps discard.
-
-\paragraph{A harder, more realistic world.}
-Every limitation of Section~\ref{subsec:exp-discussion} is a research
-direction: moving or evasive targets; correlated or passage-blocking faults;
-and, most pointedly given the ethical analysis, an \emph{adversary} that
-chooses when and whom to disable and how to jam communication --- turning the
-benign i.i.d.\ fault process into a strategic one and the cooperative game
-into a mixed one. Finally, the whole study is simulation-only: continuous
-dynamics, sensor and localization noise, and communication latency and loss
-all stand between this grid world and a physical swarm, and closing that
-sim-to-real gap --- while preserving the fault tolerance that is the point of
-the exercise --- is the direction in which the work would have to move to
-matter outside the laboratory.
+Three directions reach further. On coordination, the finding that communication
+contributes little here (Section~\ref{subsec:exp-ablations}) is partly a property
+of the task and partly of the design: \emph{learned} messages would let the
+system decide \emph{what} to share, and a task that genuinely rewarded
+information sharing --- a target visible only from afar, heterogeneous sensors,
+partial views that must be combined --- would exercise that channel far harder
+than target-in-a-maze search does, while value-decomposition methods
+(VDN/QMIX-style) would replace the shared-terminal credit heuristic with a
+learned factorization of team value. On representation, the hand-crafted
+knowledge maps that let a memoryless policy act under partial observability
+(Section~\ref{subsec:prob-obs}) could give way to a learned recurrent or
+attention-based memory over the observation history. And on the world itself,
+every limitation of Section~\ref{subsec:exp-discussion} is a research direction:
+moving or evasive targets, correlated or passage-blocking faults, and --- most
+pointedly given the ethical analysis --- an \emph{adversary} choosing when and
+whom to disable and how to jam communication, turning the benign i.i.d.\ fault
+process into a strategic one and the cooperative game into a mixed one. Closing
+the sim-to-real gap while preserving the fault tolerance that is the point of the
+exercise is the direction in which the work would have to move to matter outside
+the laboratory.

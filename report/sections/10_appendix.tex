@@ -21,7 +21,7 @@ Grid size            & $\gridsize\times\gridsize$ & fixed; never randomized (Inv
 Action space         & $4$ (up/down/left/right)   & no ``stay'' action; masked at grid/obstacle edges \\
 Vision metric        & Chebyshev                  & $(2\rvis{+}1)^2$ square window \\
 Comm.\ metric        & Manhattan                  & range-limited pairwise map fusion \\
-Global channels      & $6$                        & Visited, Obstacle, Trajectory, Target, Own\_Position, Broken \\
+Global channels      & $6$                        & Visited, Obstacle, Trajectory, Target, Own\_Pos., Broken \\
 Local channels       & $5$                        & cropped $13\times13$ egocentric patch \\
 Context dimension    & $5$                        & $[\rvis, \rcomm, \nagents, \text{agent\_id}, \hat n]$ \\
 Discount $\gamma$    & $0.97$                     & effective horizon for search \\
@@ -159,7 +159,8 @@ conda activate rl-drone
 python main.py --mode train
 
 # Qualitative inspection
-python main.py --mode eval  --checkpoint checkpoints/best.pt [--fault-prob P] [--auto-nav]
+python main.py --mode eval --checkpoint checkpoints/best.pt \
+                                          [--fault-prob P] [--auto-nav]
 python main.py --mode simulate            # GUI: fault slider, auto-nav toggle
 
 # The experiments of Section 7 (writes testing_results/{csv,plots})
@@ -175,11 +176,15 @@ python testing/evaluate_policy.py --axis epoch    --seeds 300
 \section{Additional Figures}
 \label{app:figures}
 
-For completeness, Figures~\ref{fig:app-vision} and~\ref{fig:app-maxsteps}
-give the two one-factor sweeps summarized in Table~\ref{tab:generalization}
-but not shown in the body: the vision-radius and step-budget axes. The six
-panels of each follow the layout of Figures~\ref{fig:sweep-nagents}
-and~\ref{fig:sweep-density}.
+For completeness this appendix collects four figures referenced from the body but
+not shown there. Figures~\ref{fig:app-vision} and~\ref{fig:app-maxsteps} give the
+two one-factor sweeps summarized in Table~\ref{tab:generalization} --- the
+vision-radius and step-budget axes --- with the six panels of each following the
+layout of Figures~\ref{fig:sweep-nagents} and~\ref{fig:sweep-density}.
+Figures~\ref{fig:schedules}--\ref{fig:epoch} then document the training run of
+Section~\ref{sec:training}: its two per-episode schedules, the in-training
+evaluation that drives checkpoint selection, and the checkpoint-level learning
+curve discussed in Section~\ref{subsec:exp-generalization}.
 
 \begin{figure}[h]
 \centering
@@ -199,4 +204,44 @@ returns as the budget grows; a larger budget only rescues episodes that were
 already close to succeeding. No OOD region is defined for this axis (the
 budget is not a randomized factor).}
 \label{fig:app-maxsteps}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_schedules.png}
+\caption{The two per-episode schedules of the final $50{,}000$-episode run.
+\emph{(a)} $\varepsilon$ decays multiplicatively to its $0.05$ floor at episode
+$5{,}990$; \emph{(b)} the learning rate warms up over the first $10\%$ of
+episodes to $5\times10^{-4}$, then anneals cosine-wise to $10^{-6}$. The two are
+deliberately out of phase: exploration has essentially finished annealing while
+the learning rate is still near its peak, so the bulk of the high-learning-rate
+budget is spent on a near-greedy --- and therefore task-relevant --- state
+distribution.}
+\label{fig:schedules}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{fig_training_eval.png}
+\caption{In-training greedy evaluation of the same run, executed every $1{,}000$
+episodes on the fixed bank of $20$ seeded instances that drives checkpoint
+selection; \emph{(a)} success rate and \emph{(b)} mean return, best values
+circled. These levels are not comparable with those of
+Section~\ref{sec:experiments}: this bank samples the \emph{full} randomization
+ranges --- solo drones, $\rvis{=}1$, faults active --- whereas
+Section~\ref{sec:experiments} measures at the reference operating point. The
+$5$-point sawtooth in \emph{(a)} is the quantization of a $20$-instance bank,
+which is the noise the strict-improvement selection rule is designed not to
+chase. Both panels flatten by around episode $7{,}000$.}
+\label{fig:training-eval}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{fig_epoch.png}
+\caption{Learning curve: every periodic checkpoint of the final run,
+evaluated greedily at the reference operating point ($300$ seeds). Success
+plateaus near $85\%$ while SPL keeps improving, indicating late refinement of
+path quality rather than of find rate.}
+\label{fig:epoch}
 \end{figure}

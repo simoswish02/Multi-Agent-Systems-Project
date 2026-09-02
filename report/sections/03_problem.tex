@@ -73,13 +73,12 @@ $T_{\max}$ agent-turns; if the budget expires before the target is reached,
 the episode fails.
 
 Two features make the problem distinctly harder than classical cooperative
-exploration. First, all drones start from the \emph{same} cell, so any
-efficient division of the search space must be produced by the drones
-themselves --- nothing in the environment assigns regions or roles. Second,
-at any turn a live drone may irreversibly break with probability $\pfault$
-(Section~\ref{subsec:prob-fault}); the survivors must absorb the loss and
-re-cover the region the wreck leaves unsearched, without any central entity
-telling them that a teammate is gone.
+exploration: all drones start from the \emph{same} cell, so any efficient
+division of the search space must be produced by the drones themselves ---
+nothing in the environment assigns regions or roles --- and at any turn a live
+drone may irreversibly break (Section~\ref{subsec:prob-fault}), leaving the
+survivors to absorb the loss without any central entity telling them a teammate
+is gone.
 
 \subsection{Formal model}
 \label{subsec:prob-model}
@@ -100,17 +99,15 @@ $\mathcal{A}_i = \mathcal{A}$ for all $i$.
 \paragraph{State.}
 A global state
 $s^t = \bigl(\mathcal{O},\, g,\, (p_i^t)_i,\, (\beta_i^t)_i,\,
-(K_i^t)_i,\, t\bigr)$
-collects the (episode-fixed) obstacle layout and target position, the drone
-positions and alive flags, each drone's knowledge state, and the turn
-counter. Including the knowledge states $K_i^t$ in $s^t$ is deliberate: the
-per-drone observation is a deterministic rendering of $K_i^t$
-(Section~\ref{subsec:prob-obs}), so the process is Markovian in $s^t$, and
-partial observability arises precisely from the gap between $K_i^t$ and the
-full state. Episode-level parameters
-$\theta = (\rvis, \rcomm, \nagents, \rho, \pfault)$ are drawn at the start of
-every episode and held fixed within it; their per-episode randomization is a
-training-time design choice discussed in Section~\ref{sec:training}.
+(K_i^t)_i,\, t\bigr)$ collects the episode-fixed obstacle layout and target
+position, the drone positions and alive flags, each drone's knowledge state and
+the turn counter. Including the knowledge states is deliberate: the per-drone
+observation is a deterministic rendering of $K_i^t$
+(Section~\ref{subsec:prob-obs}), so the process is Markovian in $s^t$ and partial
+observability arises precisely from the gap between $K_i^t$ and the full state.
+Episode-level parameters $\theta = (\rvis, \rcomm, \nagents, \rho, \pfault)$ are
+drawn at the start of every episode and held fixed within it, a training-time
+design choice discussed in Section~\ref{sec:training}.
 
 \paragraph{Sequential execution.}
 Time advances in \emph{agent-turns}. At turn $t$ the acting drone is
@@ -119,11 +116,9 @@ of $\nagents$ consecutive turns in fixed order. Only the acting drone selects
 an action; every other drone's position is unchanged. Crucially, a turn is
 consumed \emph{even when the acting drone is broken}
 (Section~\ref{subsec:prob-fault}): the clock never skips, so losing drones
-never stretches the time budget. Sequential execution gives collisions and
-map updates an unambiguous semantics (there are no simultaneous-move
-conflicts to resolve) and matches the execution model of the learning
-architecture, where all drones are driven by a single shared network
-(Section~\ref{sec:architecture}).
+never stretches the time budget. Sequential execution gives collisions and map updates an unambiguous semantics
+--- there are no simultaneous-move conflicts to resolve --- and matches the
+execution model of Section~\ref{sec:architecture}.
 
 \paragraph{Transition.}
 The transition kernel $P$ composes a stochastic fault event with a
@@ -138,15 +133,13 @@ of stochasticity are the episode initialization (layout, target, spawn
 corner, $\theta$) and the fault process.
 
 \paragraph{Action masking.}
-The acting drone receives a binary mask over $\mathcal{A}$ that disables
-moves leaving the grid or entering an obstacle in one of the four adjacent
-cells. Because $\rvis \geq 1$, the adjacent cells are always inside the
-drone's current vision set, so the mask adds no information beyond what the
-drone has already observed --- it merely removes actions whose outcome
-(bouncing in place) is already known, shrinking the exploration space. A
-safety fallback re-enables all actions in the degenerate case where a drone
-is boxed in on all four sides, guaranteeing the policy always has a legal
-choice.
+The acting drone receives a binary mask over $\mathcal{A}$ disabling moves that
+leave the grid or enter an adjacent obstacle. Because $\rvis \geq 1$ the adjacent
+cells are always inside the drone's vision set, so the mask adds no information
+beyond what the drone has already observed --- it merely removes actions whose
+outcome (bouncing in place) is known, shrinking the exploration space. A fallback
+re-enables all actions in the degenerate case of a drone boxed in on all four
+sides, so the policy always has a legal choice.
 
 \paragraph{Episode end.}
 The episode \emph{terminates} (success) as soon as the acting drone's new
@@ -169,7 +162,7 @@ V_i^t \;=\; \bigl\{\, c \in \mathcal{G} \;:\;
 i.e.\ a $(2\rvis{+}1)\times(2\rvis{+}1)$ box clipped to the grid. Sensing is
 noiseless but strictly local: nothing outside $V_i^t$ is perceived.
 
-What the policy consumes, however, is not the instantaneous percept but an
+What the policy consumes is not the instantaneous percept but an
 \emph{accumulated knowledge state}. Drone $i$ maintains
 $K_i^t = (\mathit{Vis}_i, \mathit{Obs}_i, \mathit{Tgt}_i, \tau_i,
 \mathit{Brk}_i, \mathcal{C}_i)$, a set of spatial maps over $\mathcal{G}$
@@ -179,23 +172,20 @@ updated after every move: for every cell $c \in V_i^t$,
 \mathit{Tgt}_i(c) \leftarrow 1 \;\; \text{if } c = g, \qquad
 \mathit{Vis}_i(c) \leftarrow 1 \;\; \text{otherwise}.
 \]
-All three maps are monotone --- knowledge is never forgotten, so a target
-spotted once remains marked even after it leaves the field of view. The
-trajectory map $\tau_i(c)$ counts how many times drone $i$ itself has
-occupied cell $c$; unlike the other maps it is \emph{private}
-(never communicated), acting as a personal revisit memory. The crash-site
-map $\mathit{Brk}_i$ and the crashed-teammate set $\mathcal{C}_i$ record
-fault knowledge and are described in Section~\ref{subsec:prob-fault}.
+All three maps are monotone --- knowledge is never forgotten, so a target spotted
+once stays marked after it leaves the field of view. The trajectory map
+$\tau_i(c)$ counts how many times drone $i$ has itself occupied cell $c$ and,
+unlike the others, is \emph{private} (never communicated), acting as a personal
+revisit memory; the crash-site map $\mathit{Brk}_i$ and the crashed-teammate set
+$\mathcal{C}_i$ record fault knowledge (Section~\ref{subsec:prob-fault}).
 
-The observation $o_i^t \in \Omega_i$ delivered to the policy is a
-deterministic, multi-channel rendering of $K_i^t$ plus the drone's own
-position and the positions of \emph{live} teammates currently inside
-$V_i^t$; its exact tensor encoding is an architectural matter deferred to
-Section~\ref{subsec:arch-obs}. Conceptually, the accumulated maps play the
-role of a hand-crafted belief state
-(cf.\ Section~\ref{subsec:bg-marl}): they compress the interaction history
-into a spatial summary, which is what allows a memoryless (non-recurrent)
-policy to act reasonably in a partially observable world.
+The observation $o_i^t \in \Omega_i$ delivered to the policy is a deterministic,
+multi-channel rendering of $K_i^t$ plus the drone's own position and the
+positions of \emph{live} teammates currently inside $V_i^t$; its tensor encoding
+is deferred to Section~\ref{subsec:arch-obs}. Conceptually the accumulated maps
+are the hand-crafted belief state of Section~\ref{subsec:bg-marl}, compressing
+the interaction history into a spatial summary --- which is what allows a
+memoryless policy to act reasonably under partial observability.
 
 \subsection{Communication model}
 \label{subsec:prob-comm}
@@ -219,15 +209,14 @@ $i \in S$. Merging over connected components makes communication
 all three end up with identical fused maps even if $A$ and $C$ are far
 apart --- intermediate drones act as relays.
 
-Three properties of this mechanism are worth stressing, as they carry the
-multi-agent analysis of Section~\ref{sec:mas}. First, fusion is
-\emph{anonymous}: the max-merge keeps no record of who contributed which
-cell, so shared knowledge detaches from its producer. Second, it is
-\emph{persistent}: knowledge received in an encounter survives after the
-drones part ways, because it is written into the receiver's own maps. Third,
-it is \emph{selective}: the trajectory map $\tau_i$ is deliberately excluded
-from fusion, so the revisit-avoidance signal remains individual. Wrecks
-neither transmit nor receive --- a broken drone's maps freeze at fault time.
+Three properties of this mechanism carry the multi-agent analysis of
+Section~\ref{sec:mas}. Fusion is \emph{anonymous} --- the max-merge keeps no
+record of who contributed which cell, so shared knowledge detaches from its
+producer; \emph{persistent} --- knowledge received in an encounter survives after
+the drones part ways, being written into the receiver's own maps; and
+\emph{selective} --- the trajectory map $\tau_i$ is excluded from fusion, so the
+revisit-avoidance signal remains individual. Wrecks neither transmit nor
+receive: a broken drone's maps freeze at fault time.
 
 \subsection{Fault model}
 \label{subsec:prob-fault}
@@ -356,33 +345,29 @@ r_i^t \;=\; r_{\mathrm{step}}
 \;+\; c \, r_{\mathrm{expl}}
 \;+\; \mathbb{1}[p_i^{t} = g]\, R_{\mathrm{tgt}} ,
 \]
-and the learning objective is the usual expected discounted return with
-discount $\gamma$. Each term implements one facet of the task:
+and the learning objective is the usual expected discounted return with discount
+$\gamma$. Each term implements one facet of the task:
 
 \begin{itemize}[leftmargin=1.5em]
-  \item \emph{Time pressure.} The constant step penalty makes every turn
-    costly, so faster target acquisition strictly dominates.
-  \item \emph{Efficient coverage.} The exploration bonus counts cells that
-    are new \emph{to the team} (the union of all discovered sets), not to
-    the individual: re-discovering a region a teammate already swept earns
-    nothing, which rewards complementary --- rather than duplicated ---
-    search.
-  \item \emph{Revisit avoidance.} The revisit penalty is linear in the
-    drone's own prior visit count $k$ of the destination cell, so the
-    cumulative cost of oscillating on the same spot grows quadratically with
-    the number of passes; pacing back and forth is increasingly expensive.
-  \item \emph{Dispersion.} The collision penalty charges co-location with
-    live teammates. Since all drones spawn on the same corner, this is the
-    only signal pushing the team to split; no region assignment or
-    coordination protocol is provided (a point developed in
-    Section~\ref{subsec:mas-coordination}).
-  \item \emph{Team credit.} With the cooperative credit-assignment variant
-    used in the final configuration (\texttt{shared\_target\_reward}), the
-    terminal bonus $R_{\mathrm{tgt}}$ is granted to the whole surviving
-    team rather than only to the finder, aligning individual returns with
-    the identical-interest objective; drones that broke before the find are
-    excluded. The learning-side implications of this choice are discussed in
-    Section~\ref{subsec:train-correctness}.
+  \item \emph{Time pressure and efficient coverage.} The constant step penalty
+    makes every turn costly, so faster acquisition strictly dominates; the
+    exploration bonus counts cells that are new \emph{to the team} (the union of
+    all discovered sets), not to the individual, so re-discovering a region a
+    teammate already swept earns nothing --- rewarding complementary rather than
+    duplicated search.
+  \item \emph{Revisit avoidance.} The revisit penalty is linear in the drone's
+    own prior visit count $k$ of the destination cell, so the cumulative cost of
+    oscillating on one spot grows quadratically with the number of passes.
+  \item \emph{Dispersion.} The collision penalty charges co-location with live
+    teammates. Since all drones spawn on the same corner this is the only signal
+    pushing the team to split; no region assignment or coordination protocol is
+    provided (a point developed in Section~\ref{subsec:mas-coordination}).
+  \item \emph{Team credit.} With the cooperative variant used in the final
+    configuration (\texttt{shared\_\allowbreak target\_\allowbreak reward}),
+    $R_{\mathrm{tgt}}$ is granted
+    to the whole \emph{surviving} team rather than only to the finder, aligning
+    individual returns with the identical-interest objective; the learning-side
+    implications are discussed in Section~\ref{subsec:train-correctness}.
 \end{itemize}
 
 At evaluation time (Section~\ref{sec:experiments}) the reward is set aside
@@ -394,6 +379,3 @@ cells discovered by the team),
 and \emph{redundancy} (overlap between the regions swept by different
 drones). The last two also serve as quantitative signatures of the emergent
 division of labour analysed in Section~\ref{subsec:mas-emergence}.
-
-% TODO (figures pass): consider adding a GUI screenshot next to the TikZ
-% schematic once final visuals are ready.
