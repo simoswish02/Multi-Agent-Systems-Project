@@ -1,16 +1,12 @@
 \section{System Architecture}
 \label{sec:architecture}
 
-The system is implemented from scratch in Python. This section walks through
-its architecture bottom-up: the codebase layout and its configuration-driven
-design (Section~\ref{subsec:arch-overview}), the environment implementation
-(Section~\ref{subsec:arch-env}), the tensor encoding of the observations of
-Section~\ref{subsec:prob-obs} (Section~\ref{subsec:arch-obs}), the neural
-network that maps observations to action values
-(Section~\ref{subsec:arch-network}), the context vector that conditions it
-(Section~\ref{subsec:arch-context}), the learning machinery around it
-(Section~\ref{subsec:arch-learning}), and the interactive tooling used for
-inspection and evaluation (Section~\ref{subsec:arch-tooling}).
+The system is implemented from scratch in Python. This section walks through its
+architecture bottom-up: the codebase layout and its configuration-driven design,
+the environment implementation, the tensor encoding of the observations of
+Section~\ref{subsec:prob-obs}, the neural network that maps observations to
+action values, the context vector that conditions it, the learning machinery
+around it, and the interactive tooling used for inspection and evaluation.
 
 \subsection{Overview and module layout}
 \label{subsec:arch-overview}
@@ -81,12 +77,11 @@ these packages.
 A single YAML file is the sole source of truth for every tunable quantity:
 geometry and reward values, randomization ranges, curriculum phases, network and
 optimizer hyperparameters, logging cadence. The consequence is methodological:
-an experiment --- including the full training curriculum --- is specified by
-editing configuration, not code. The same discipline governs derived quantities;
-the normalizers of the context vector (Section~\ref{subsec:arch-context}), for
-instance, are computed from the randomization ranges rather than stated
-independently, so widening a range cannot silently desynchronize the network's
-inputs.
+an experiment, including the full training curriculum, is specified by editing
+configuration, not code. The same discipline governs derived quantities; the
+normalizers of the context vector, for instance, are computed from the
+randomization ranges rather than stated independently, so widening a range cannot
+silently desynchronize the network's inputs.
 
 \subsection{Environment implementation}
 \label{subsec:arch-env}
@@ -94,8 +89,8 @@ inputs.
 \texttt{DroneSearchEnv} realizes the model of Section~\ref{subsec:prob-model}
 behind a Gymnasium-style interface \citep{towers2024gymnasium}, with one
 essential extension: the native stepping primitive is
-\texttt{step\_agent(i, action)} --- one call per drone per round, in fixed
-round-robin order --- rather than a joint step (a standard \texttt{step(action)}
+\texttt{step\_agent(i, action)}, one call per drone per round in fixed
+round-robin order, rather than a joint step (a standard \texttt{step(action)}
 wrapper exists for API compliance, but the training loop drives
 \texttt{step\_agent} directly). Episode setup follows a strict contract:
 \texttt{set\_domain\_params(...)}, which installs
@@ -107,29 +102,25 @@ diverge.
 
 \paragraph{World generation.}
 \texttt{reset()} performs rejection sampling: it draws an obstacle map with
-density $\rho$, forces the reference corner free, computes the
-BFS-reachable region, and resamples (up to a bounded number of attempts) if
-that region is trivial; the target is then drawn uniformly from the
-reachable free cells. All randomness flows through a single seeded
-generator, and map generation consumes it before the fault process does ---
-so one seed reproduces the layout \emph{and} the fault sequence, a property
-the evaluation protocol relies on
-(Section~\ref{subsec:train-infra}).
+density $\rho$, forces the reference corner free, computes the BFS-reachable
+region, and resamples (up to a bounded number of attempts) if that region is
+trivial; the target is then drawn uniformly from the reachable free cells. All
+randomness flows through a single seeded generator, and map generation consumes
+it before the fault process does, so one seed reproduces the layout \emph{and}
+the fault sequence, a property the evaluation protocol relies on.
 
 \paragraph{Anatomy of a turn.}
-A live drone's \texttt{step\_agent} call executes a fixed pipeline: (i)~the
-fault coin flip of Section~\ref{subsec:prob-fault} (on a break, the rest of
-the pipeline is skipped and the call returns a flagged no-op, the turn having
-been spent all the same); (ii)~move validation and execution,
-accumulating the reward terms of Table~\ref{tab:reward}; (iii)~vision update
-of the drone's knowledge maps; (iv)~wreck-beacon detection;
-(v)~communication fusion over the connectivity components of
-Section~\ref{subsec:prob-comm}; (vi)~update of the team-level discovered
-set, from which the exploration bonus is computed; (vii)~target check. A
-wreck's call skips everything but the clock. The action mask of
-Section~\ref{subsec:prob-model} is computed on demand per drone and
-returned alongside the observation, so every consumer (training, evaluation,
-GUI) applies exactly the same legality rule.
+A live drone's \texttt{step\_agent} call executes a fixed pipeline: (i)~the fault
+coin flip (on a break, the rest of the pipeline is skipped and the call returns a
+flagged no-op, the turn having been spent all the same); (ii)~move validation and
+execution, accumulating the reward terms of Table~\ref{tab:reward};
+(iii)~vision update of the drone's knowledge maps; (iv)~wreck-beacon detection;
+(v)~communication fusion over the connectivity components; (vi)~update of the
+team-level discovered set, from which the exploration bonus is computed;
+(vii)~target check. A wreck's call skips everything but the clock. The action
+mask is computed on demand per drone and returned alongside the observation, so
+every consumer (training, evaluation, GUI) applies exactly the same legality
+rule.
 
 \subsection{Observation encoding}
 \label{subsec:arch-obs}
@@ -144,13 +135,13 @@ The knowledge state $K_i^t$ reaches the network as two spatial tensors
 \toprule
 \textbf{Ch.} & \textbf{Name} & \textbf{Stream} & \textbf{Encoding} \\
 \midrule
-0 & Visited        & both   & $\{0,1\}$ --- free cells discovered by drone $i$ (incl.\ fused) \\
-1 & Obstacle       & both   & $\{0,1\}$ --- obstacles discovered by drone $i$ \\
-2 & Trajectory     & both   & $\min(\tau_i(c)/5,\,1)$ --- own visit counts, saturating \\
-3 & Target         & both   & $\{0,1\}$ --- target cell once seen (persistent memory) \\
-4 & Own\_Position  & global & $\{0,1\}$ --- single $1$ at drone $i$'s cell \\
-5 & Broken         & global & $\{0,1\}$ --- crash sites \emph{known to drone $i$} \\
-4 & Other\_Position& local  & $\{0,1\}$ --- \emph{live} teammates currently within $V_i^t$ \\
+0 & Visited        & both   & $\{0,1\}$: free cells discovered by drone $i$ (incl.\ fused) \\
+1 & Obstacle       & both   & $\{0,1\}$: obstacles discovered by drone $i$ \\
+2 & Trajectory     & both   & $\min(\tau_i(c)/5,\,1)$: own visit counts, saturating \\
+3 & Target         & both   & $\{0,1\}$: target cell once seen (persistent memory) \\
+4 & Own\_Position  & global & $\{0,1\}$: single $1$ at drone $i$'s cell \\
+5 & Broken         & global & $\{0,1\}$: crash sites \emph{known to drone $i$} \\
+4 & Other\_Position& local  & $\{0,1\}$: \emph{live} teammates currently within $V_i^t$ \\
 \bottomrule
 \end{tabular}
 \caption{Observation channels. The \emph{global} stream
@@ -158,7 +149,7 @@ The knowledge state $K_i^t$ reaches the network as two spatial tensors
 stream ($5\times\gridsize\times\gridsize$) is cropped to a $13\times13$
 patch centred on the drone before encoding. Channel 4 differs by stream: the
 egocentric patch needs no own-position marker, but benefits from seeing
-nearby teammates; wrecks never appear as teammates --- they surface in the
+nearby teammates. Wrecks never appear as teammates: they surface in the
 Broken channel instead, once known.}
 \label{tab:channels}
 \end{table}
@@ -166,17 +157,17 @@ Broken channel instead, once known.}
 Two encoding decisions deserve justification. First, \textbf{the drone's own
 position is a spatial channel}, not an out-of-band coordinate pair: channel 4 of
 the global stream holds a single $1$ at the drone's cell, so the convolutional
-encoder can reason about position \emph{spatially} --- its relation to obstacles,
-to the searched region, to known crash sites --- while still recovering the
+encoder can reason about position \emph{spatially}, in its relation to obstacles,
+to the searched region and to known crash sites, while still recovering the
 integer coordinates exactly ($\arg\max$ over that channel) whenever it needs
 them, as the patch-cropping step does. Second, \textbf{fault knowledge is spatial
 too}: the Broken channel marks the crash sites drone $i$ knows about, and only
-those (Section~\ref{subsec:prob-fault}). Beyond the scalar belief $\hat n_i$, the
-\emph{location} of a crash tells the network \emph{which region} lost its
-searcher --- precisely what is needed to re-cover a dead teammate's sector.
-The local stream then complements the global one at a different scale: its
-$13\times13$ crop, sized to exceed the largest vision window ($2\cdot6+1 = 13$),
-retains full resolution where cell-level distinctions drive immediate action.
+those. Beyond the scalar belief $\hat n_i$, the \emph{location} of a crash tells
+the network \emph{which region} lost its searcher, precisely what is needed to
+re-cover a dead teammate's sector. The local stream then complements the global
+one at a different scale: its $13\times13$ crop, sized to exceed the largest
+vision window ($2\cdot6+1 = 13$), retains full resolution where cell-level
+distinctions drive immediate action.
 
 \subsection{Neural architecture}
 \label{subsec:arch-network}
@@ -238,11 +229,10 @@ arises only from per-drone inputs.}
 \end{figure}
 
 A single network (Figure~\ref{fig:network}) maps
-$(o_i^{\mathrm{glob}}, o_i^{\mathrm{loc}}, \mathbf{c}_i)$ --- global stream,
-local stream, context vector --- to the four action values. It fuses three
+$(o_i^{\mathrm{glob}}, o_i^{\mathrm{loc}}, \mathbf{c}_i)$, that is global stream,
+local stream and context vector, to the four action values. It fuses three
 information pathways: a \emph{global encoder} for strategic structure, a
-\emph{local encoder} for tactical detail, and the context for regime
-awareness.
+\emph{local encoder} for tactical detail, and the context for regime awareness.
 
 \paragraph{Global encoder.}
 The global stream is processed by a ConvNeXt-style hierarchy
@@ -254,8 +244,8 @@ at spatial resolutions $32 \to 16 \to 8$, regularized by stochastic depth
 applies a context-conditioned affine transformation
 $\mathrm{FiLM}(x) = \gamma(\mathbf{c})\odot x + \beta(\mathbf{c})$ (initialized
 to identity), letting the sampled regime modulate feature extraction at every
-scale. The final $8\times8$ map is flattened into 64 tokens --- augmented with a
-learned CLS token and a projected context token --- and passed through a 3-layer
+scale. The final $8\times8$ map is flattened into 64 tokens, augmented with a
+learned CLS token and a projected context token, and passed through a 3-layer
 Transformer encoder \citep{vaswani2017attention}, the CLS output being
 concatenated with the mean of the spatial tokens and projected to a
 1024-dimensional embedding. This convolution-plus-attention hybrid, in the spirit
@@ -271,24 +261,23 @@ Own\_\allowbreak Position channel, is encoded by three ConvNeXt blocks at consta
 field): on a grid where every cell matters, a stride would destroy exactly the
 cell-level distinctions the patch exists to preserve. A FiLM layer conditioned on
 the \emph{global embedding} rather than on the raw context then modulates the
-local features --- the strategic picture reshapes how tactical surroundings are
-read --- before projection to a 384-dimensional embedding.
+local features, so that the strategic picture reshapes how tactical surroundings
+are read, before projection to a 384-dimensional embedding.
 
 \paragraph{Dueling head.}
-Global embedding, local embedding, and raw context are concatenated
-($1024 + 384 + 5 = 1413$) and passed through a three-layer fully connected
-trunk ($1536 \to 768 \to 384$, each with layer normalization and GELU) that
-feeds the dueling decomposition of Section~\ref{subsec:bg-dqn}: separate
-value and advantage heads recombined as
-$Q = V + A - \operatorname{mean}(A)$.
+Global embedding, local embedding and raw context are concatenated
+($1024 + 384 + 5 = 1413$) and passed through a three-layer fully connected trunk
+($1536 \to 768 \to 384$, each with layer normalization and GELU) that feeds the
+dueling decomposition of Section~\ref{subsec:bg-dqn}: separate value and
+advantage heads recombined as $Q = V + A - \operatorname{mean}(A)$.
 
 \paragraph{Normalization discipline.}
-The network uses layer normalization \citep{ba2016layer} and GRN exclusively ---
-no batch normalization anywhere --- for an operational reason: batch statistics
-would make the batch-of-one greedy inference each drone executes at every turn
-behave differently from a batched training forward pass. With
-batch-size-independent normalization the two are identical by construction; the
-only module that distinguishes them is stochastic depth, inactive at inference.
+The network uses layer normalization \citep{ba2016layer} and GRN exclusively, no
+batch normalization anywhere, for an operational reason: batch statistics would
+make the batch-of-one greedy inference each drone executes at every turn behave
+differently from a batched training forward pass. With batch-size-independent
+normalization the two are identical by construction; the only module that
+distinguishes them is stochastic depth, inactive at inference.
 
 \subsection{Context vector}
 \label{subsec:arch-context}
@@ -305,37 +294,36 @@ randomization and the network:
 \tfrac{\hat n_i}{\nagents^{\max}}
 \Bigr),
 \]
-where the normalizers are the \emph{maxima of the randomization ranges},
-derived programmatically from the configuration
-(Section~\ref{subsec:arch-overview}). Each component has a distinct role:
+where the normalizers are the \emph{maxima of the randomization ranges}, derived
+programmatically from the configuration. Each component has a distinct role:
 
 \begin{itemize}[leftmargin=1.5em]
-  \item \emph{Sensing and communication ranges} tell the policy which
-    regime it is operating in, enabling regime-dependent behaviour
-    (Section~\ref{subsec:bg-dr}) --- e.g.\ how much a corridor can be
-    trusted as ``explored'' given the width of the vision window.
+  \item \emph{Sensing and communication ranges} tell the policy which regime it
+    is operating in, enabling regime-dependent behaviour: how much a corridor
+    can be trusted as ``explored'' given the width of the vision window, for
+    instance.
   \item \emph{Team size and agent identity.} The identity term is the symmetry
     breaker required by parameter sharing (Section~\ref{subsec:bg-marl}), and
     here it is not optional: all drones spawn on the \emph{same} cell with
     identical knowledge, so without $i$ in the input a shared deterministic
     policy would move them identically, forever. With it, the network can learn
-    an implicit role assignment --- conditioned on identity, disperse in
-    different directions.
-  \item \emph{Believed alive count} $\hat n_i$ is the fault model's entry
-    point into decision-making: as the believed team shrinks, the division
-    of labour that made sense for $\nagents$ drones no longer does, and the
-    policy can recalibrate --- e.g.\ widen its own effective sector.
+    an implicit role assignment: conditioned on identity, disperse in different
+    directions.
+  \item \emph{Believed alive count} $\hat n_i$ is the fault model's entry point
+    into decision-making. As the believed team shrinks, the division of labour
+    that made sense for $\nagents$ drones no longer does, and the policy can
+    recalibrate, widening its own effective sector.
 \end{itemize}
 
-Because $\hat n_i^t$ evolves within the episode
-(Section~\ref{subsec:prob-fault}), the context is \emph{rebuilt at every
-turn for every drone}; it is a per-decision input, not an episode constant.
+Because $\hat n_i^t$ evolves within the episode, the context is \emph{rebuilt at
+every turn for every drone}; it is a per-decision input, not an episode constant.
 Deliberately \emph{absent} from the context are the two remaining randomized
-parameters: obstacle density (redundant --- the network sees actual
-obstacles in its maps, a far richer signal than a scalar summary) and fault
-probability (unknowable --- a real drone has no access to its own failure
-rate, so training a dependence on it would build in an input that deployment
-cannot supply, exactly the pitfall noted in Section~\ref{subsec:bg-dr}).
+parameters: obstacle density, which is redundant since the network sees actual
+obstacles in its maps, a far richer signal than a scalar summary; and fault
+probability, which is unknowable, since a real drone has no access to its own
+failure rate, so training a dependence on it would build in an input that
+deployment cannot supply, exactly the pitfall noted in
+Section~\ref{subsec:bg-dr}.
 
 \subsection{Learning machinery}
 \label{subsec:arch-learning}
@@ -345,16 +333,15 @@ Every drone's transitions flow through a per-drone $n$-step window into one
 \emph{shared} replay buffer (uniform sampling, $2\times10^5$ capacity):
 parameter sharing extends to experience, and the network trains on the pooled
 stream of the whole team. Per-drone windows are necessary because execution is
-sequential --- drone $i$'s ``next step'' is one round away, interleaved with every
+sequential: drone $i$'s ``next step'' is one round away, interleaved with every
 other drone's turns, so windows must be threaded by agent rather than by
 wall-clock order. Each emitted transition carries the pair
 $(R^{(m)}, \gamma^m)$, the discounted $m$-step return and the bootstrap discount,
 with $\gamma^m$ replaced by $0$ if the window hit a terminal state; so
-termination-vs-truncation semantics
-(Sections~\ref{subsec:bg-dqn} and~\ref{subsec:train-correctness}) are decided
-\emph{once}, at emission time, and the update rule stays oblivious to them. The
-window also implements the two fault-sensitive behaviours motivated later: an
-immediate bootstrapped flush when its drone breaks, and retroactive team
+termination-vs-truncation semantics are decided \emph{once}, at emission time,
+and the update rule stays oblivious to them. The window also implements the two
+fault-sensitive behaviours motivated in Section~\ref{subsec:train-correctness}:
+an immediate bootstrapped flush when its drone breaks, and retroactive team
 crediting of the terminal bonus, which requires the terminal round to still be
 pending (hence $n \geq 2$).
 
@@ -367,16 +354,15 @@ interleaves with acting at a fixed ratio. Hyperparameter values are consolidated
 in Appendix~\ref{app:config}.
 
 \paragraph{Batched decentralized acting.}
-At every round, action selection for the whole team costs at most one
-forward pass: each live drone independently draws its exploration coin
-($\varepsilon$-greedy), the greedy drones' inputs are stacked into one
-batch, Q-values are computed jointly, and each drone's action mask is
-applied to its own row before the $\arg\max$ (masked actions set to
-$-\infty$; exploring drones sample uniformly among their legal actions).
-This is an implementation convenience enabled by parameter sharing --- the
-\emph{information} used for each drone's decision remains strictly its own
-observation and context, preserving decentralized-execution semantics
-(a point Section~\ref{subsec:mas-learning} returns to).
+At every round, action selection for the whole team costs at most one forward
+pass: each live drone independently draws its exploration coin
+($\varepsilon$-greedy), the greedy drones' inputs are stacked into one batch,
+Q-values are computed jointly, and each drone's action mask is applied to its own
+row before the $\arg\max$ (masked actions set to $-\infty$; exploring drones
+sample uniformly among their legal actions). This is an implementation
+convenience enabled by parameter sharing: the \emph{information} used for each
+drone's decision remains strictly its own observation and context, preserving
+decentralized-execution semantics.
 
 \subsection{Tooling and interaction modes}
 \label{subsec:arch-tooling}
@@ -391,17 +377,17 @@ episodes with live rendering of maps, beliefs and per-drone status. The renderer
 is strictly read-only with respect to the environment (Figure~\ref{fig:modules}).
 
 For quantitative work, \texttt{eval\_checkpoints.py} ranks checkpoints on
-identical fixed-seed instance sets --- the same seeds reproduce the same layouts
-\emph{and} fault sequences (Section~\ref{subsec:arch-env}) --- and
-\texttt{testing/evaluate\_policy.py} runs the one-factor-at-a-time sweeps of
-Section~\ref{sec:experiments}. Both support an optional \emph{auto-navigation}
-override: once a drone's maps contain the target, a BFS planner on its
-\emph{known} map (unknown cells optimistically assumed free, replanned every
-step) steers it there deterministically. The override exists to decouple two
-abilities in analysis --- \emph{finding} the target versus \emph{reaching} a
-found target --- and is confined to evaluation tooling by an architectural
-invariant: it never runs during training, nor during the in-training evaluation
-that selects checkpoints. In the training loop it would corrupt the data
-distribution (transitions would reflect the planner's policy, not the network's);
-in checkpoint selection it would corrupt the metric (checkpoints would be ranked
-partly on the planner's competence).
+identical fixed-seed instance sets, the same seeds reproducing the same layouts
+\emph{and} fault sequences, while \texttt{testing/\allowbreak evaluate\_policy.py}
+runs the
+one-factor-at-a-time sweeps of Section~\ref{sec:experiments}. Both support an
+optional \emph{auto-navigation} override: once a drone's maps contain the target,
+a BFS planner on its \emph{known} map (unknown cells optimistically assumed free,
+replanned every step) steers it there deterministically. The override exists to
+decouple two abilities in analysis, \emph{finding} the target versus
+\emph{reaching} a found target, and is confined to evaluation tooling by an
+architectural invariant: it never runs during training, nor during the
+in-training evaluation that selects checkpoints. In the training loop it would
+corrupt the data distribution, since transitions would reflect the planner's
+policy rather than the network's; in checkpoint selection it would corrupt the
+metric, checkpoints being ranked partly on the planner's competence.

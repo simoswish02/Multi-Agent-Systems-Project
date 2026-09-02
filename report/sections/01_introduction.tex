@@ -1,90 +1,84 @@
 \section{Introduction}
 \label{sec:introduction}
 
-When something must be found quickly over a large area --- a missing hiker,
-survivors in a collapsed structure, the front of a spreading wildfire ---
-teams of small autonomous aircraft are increasingly the tool of choice: they
-are cheap, expendable, fast to deploy, and, above all, \emph{parallel}
-\citep{queralta2020collaborative,julian2019distributed}. Yet the hard
-problem in multi-drone search is not flight; it is coordination under
-scarcity. Each vehicle perceives only a small neighbourhood of a large,
-unknown environment; communication reaches only nearby teammates, so no
-shared global picture exists; and the mission clock is unforgiving --- in
-search and rescue, time \emph{is} the objective. A team that cannot divide
-the search space effectively degenerates into an expensive single searcher.
+When something must be found quickly over a large area, be it a missing hiker,
+survivors in a collapsed structure or the front of a spreading wildfire, teams of
+small autonomous aircraft are increasingly the tool of choice: they are cheap,
+expendable, fast to deploy and, above all, \emph{parallel}
+\citep{queralta2020collaborative,julian2019distributed}. Yet the hard problem in
+multi-drone search is not flight; it is coordination under scarcity. Each vehicle
+perceives only a small neighbourhood of a large, unknown environment;
+communication reaches only nearby teammates, so no shared global picture exists;
+and the mission clock is unforgiving, since in search and rescue time \emph{is}
+the objective. A team that cannot divide the search space effectively degenerates
+into an expensive single searcher.
 
-This project adds to that already delicate setting the ingredient that
-real operations always contain and idealized models usually omit:
-\textbf{failure}. Small drones break --- motors fail, batteries die,
-weather intervenes --- and they break \emph{mid-mission}, unpredictably,
-without ceremony. A search system that presumes a fixed team is brittle in
-exactly the situations that matter most. Worse, in a genuinely
-decentralized setting a drone's death is not even \emph{announced}: its
-teammates must discover the loss through their own sensing and
-communication, and until they do, they coordinate with a phantom. Fault
-tolerance in a multi-agent system is thus not one problem but three ---
-surviving the loss (redundancy), learning of it (decentralized fault
-knowledge), and adapting to it (re-planning the division of labour) --- and
-this report treats all three as first-class design objects.
+This project adds to that already delicate setting the ingredient that real
+operations always contain and idealized models usually omit: \textbf{failure}.
+Small drones break; motors fail, batteries die, weather intervenes. And they
+break \emph{mid-mission}, unpredictably, without ceremony. A search system that
+presumes a fixed team is brittle in exactly the situations that matter most.
+Worse, in a genuinely decentralized setting a drone's death is not even
+\emph{announced}: its teammates must discover the loss through their own sensing
+and communication, and until they do, they coordinate with a phantom. Fault
+tolerance in a multi-agent system is thus not one problem but three: surviving
+the loss (redundancy), learning of it (decentralized fault knowledge), and
+adapting to it (re-planning the division of labour). This report treats all three
+as first-class design objects.
 
 \paragraph{The problem.}
 Concretely, we study the following task, formalized in
-Section~\ref{sec:problem}. A team of $\nagents$ drones spawns co-located on
-a corner of a $\gridsize\times\gridsize$ occupancy grid scattered with
-obstacles; a single target, guaranteed reachable, is hidden at an unknown
-cell. Each drone sees only a window of radius $\rvis$ around itself,
-remembers what it has seen, and fuses its accumulated map with any teammate
-within communication range $\rcomm$. The team has a hard budget of
-$T_{\max}$ turns to physically reach the target. At every turn, any live
-drone may irreversibly break with probability $\pfault$; a wreck stops
-sensing, moving, and communicating, its turns still consume the budget, and
-no one is notified --- fault knowledge spreads only through a passive
-distress beacon and the ordinary map fusion. Success is binary and
-team-level: \emph{some} drone reaches the target in time, or the episode
-fails.
+Section~\ref{sec:problem}. A team of $\nagents$ drones spawns co-located on a
+corner of a $\gridsize\times\gridsize$ occupancy grid scattered with obstacles;
+a single target, guaranteed reachable, is hidden at an unknown cell. Each drone
+sees only a window of radius $\rvis$ around itself, remembers what it has seen,
+and fuses its accumulated map with any teammate within communication range
+$\rcomm$. The team has a hard budget of $T_{\max}$ turns to physically reach the
+target. At every turn, any live drone may irreversibly break with probability
+$\pfault$; a wreck stops sensing, moving and communicating, its turns still
+consume the budget, and no one is notified: fault knowledge spreads only through
+a passive distress beacon and the ordinary map fusion. Success is binary and
+team-level: \emph{some} drone reaches the target in time, or the episode fails.
 
 \paragraph{The approach.}
-We solve the task with cooperative deep reinforcement learning under
-parameter sharing \citep{gupta2017cooperative}: a single Dueling Double DQN
-\citep{mnih2015human,vanhasselt2016double,wang2016dueling} drives every
-drone, consuming that drone's private maps through a convolutional
-architecture with an attention bottleneck, and trained on the pooled
-experience of the whole team. Rather than fixing one operating condition,
-every training episode randomizes the regime --- vision radius,
-communication range, team size, obstacle density, and fault probability
-\citep{tobin2017domain} --- and the sampled parameters that a real drone
-could plausibly know are fed back to the network as a context vector,
-together with two per-drone quantities: an identity (which breaks the
-symmetry of parameter sharing and lets co-located drones adopt different
-roles from the first step) and the drone's own \emph{belief} about how many
-teammates remain operational. The result is a single generalist policy
-that searches alone or in a team, myopic or far-sighted, in empty fields or
-cluttered mazes --- and that experiences teammate death, and the need to
-absorb it, as an ordinary feature of its world. The fault model demands
-equal care on the learning side --- a fault is exogenous bad luck, not a
-consequence of behaviour --- and Section~\ref{sec:training} details how the
-learning updates are made to respect that.
+We solve the task with cooperative deep reinforcement learning under parameter
+sharing \citep{gupta2017cooperative}: a single Dueling Double DQN
+\citep{mnih2015human,vanhasselt2016double,wang2016dueling} drives every drone,
+consuming that drone's private maps through a convolutional architecture with an
+attention bottleneck, and trained on the pooled experience of the whole team.
+Rather than fixing one operating condition, every training episode randomizes the
+regime (vision radius, communication range, team size, obstacle density and fault
+probability; \citealp{tobin2017domain}), and the sampled parameters that a real
+drone could plausibly know are fed back to the network as a context vector,
+together with two per-drone quantities: an identity, which breaks the symmetry of
+parameter sharing and lets co-located drones adopt different roles from the first
+step, and the drone's own \emph{belief} about how many teammates remain
+operational. The result is a single generalist policy that searches alone or in a
+team, myopic or far-sighted, in empty fields or cluttered mazes, and that
+experiences teammate death, and the need to absorb it, as an ordinary feature of
+its world. The fault model demands equal care on the learning side, since a fault
+is exogenous bad luck rather than a consequence of behaviour, and
+Section~\ref{sec:training} details how the learning updates are made to respect
+that.
 
 \paragraph{Why this is a multi-agent systems study.}
-A reinforcement-learning pipeline, however carefully engineered, is not by
-itself the point of this report. The system is deliberately read, in
-Section~\ref{sec:mas}, through the conceptual apparatus of multi-agent
-systems \citep{wooldridge2009introduction,jennings2001agent}: the drones
-are audited against the defining properties of agenthood; the environment
-is analysed as a first-class abstraction that mediates and governs all
-interaction; the map fusion is read as knowledge-level, protocol-free
-communication over a distributed shared dataspace; the visited-cell traces
-as a virtualized form of stigmergy; the fused map, the beacon, and the
-action mask as coordination artefacts; the team's dispersion and post-fault
-re-covering as emergent, self-organized structure that no component
-specifies; and the whole design is placed on the autonomy spectrum ---
-operationally autonomous, motivationally not. This analysis is not
-decorative: it is what connects a concrete learned system to the questions
---- about coordination, openness, resilience, and responsibility --- that
-the multi-agent perspective exists to ask. The same lens then carries the
-final part of the report, where autonomy without deliberation and
-competence without transparency become ethical and legal problems rather
-than engineering trade-offs.
+A reinforcement-learning pipeline, however carefully engineered, is not by itself
+the point of this report. The system is deliberately read, in
+Section~\ref{sec:mas}, through the conceptual apparatus of multi-agent systems
+\citep{wooldridge2009introduction,jennings2001agent}: the drones are audited
+against the defining properties of agenthood; the environment is analysed as a
+first-class abstraction that mediates and governs all interaction; the map fusion
+is read as knowledge-level, protocol-free communication over a distributed shared
+dataspace; the visited-cell traces as a virtualized form of stigmergy; the fused
+map, the beacon and the action mask as coordination artefacts; the team's
+dispersion and post-fault re-covering as emergent, self-organized structure that
+no component specifies; and the whole design is placed on the autonomy spectrum
+as operationally autonomous but motivationally not. This analysis is not
+decorative: it is what connects a concrete learned system to the questions about
+coordination, openness, resilience and responsibility that the multi-agent
+perspective exists to ask. The same lens then carries the final part of the
+report, where autonomy without deliberation and competence without transparency
+become ethical and legal problems rather than engineering trade-offs.
 
 \paragraph{Contributions.}
 The report makes the following contributions:
@@ -94,30 +88,28 @@ The report makes the following contributions:
     (Sections~\ref{sec:problem}--\ref{sec:architecture}): a configurable grid
     world, built from scratch, in which drone failures are permanent,
     unannounced, and discoverable only through a distress beacon and
-    range-limited map fusion --- no component ever accesses a global oracle of
+    range-limited map fusion, no component ever accessing a global oracle of
     team state.
   \item \emph{A single generalist policy via domain randomization and context
-    conditioning} (Sections~\ref{sec:architecture} and~\ref{sec:training}): one
-    shared network covering team sizes, sensing and communication regimes,
-    obstacle densities and fault rates, with per-drone identity and
-    believed-alive-count inputs enabling role differentiation and post-fault
-    adaptation --- trained under learning rules that treat a fault as exogenous
-    bad luck rather than as a terminal state
-    (Section~\ref{subsec:train-correctness}).
+    conditioning}: one shared network covering team sizes, sensing and
+    communication regimes, obstacle densities and fault rates, with per-drone
+    identity and believed-alive-count inputs enabling role differentiation and
+    post-fault adaptation, trained under learning rules that treat a fault as
+    exogenous bad luck rather than as a terminal state.
   \item \emph{A systematic multi-agent reading of the system}
     (Section~\ref{sec:mas}): a detailed mapping between the implemented
-    mechanisms and the paradigm's core concepts --- agenthood, environment,
-    coordination, artefacts, self-organisation, openness, autonomy, and
+    mechanisms and the paradigm's core concepts, namely agenthood, environment,
+    coordination, artefacts, self-organisation, openness, autonomy and
     multi-agent learning.
   \item \emph{An empirical demonstration of generalization and graceful
     degradation} (Section~\ref{sec:experiments}): a seeded,
     one-factor-at-a-time protocol ($500$ episodes per configuration) showing
     that the policy holds essentially flat across team size, vision and
-    communication --- including \emph{beyond} the ranges it was trained on ---
-    while obstacle density is the one axis that genuinely governs difficulty;
-    and, as the headline result, that success falls by under six points across
-    the entire trained fault range and still reaches $66\%$ at more than triple
-    that rate, where half the team is lost on average, with no cliff.
+    communication, including \emph{beyond} the ranges it was trained on, while
+    obstacle density is the one axis that genuinely governs difficulty; and, as
+    the headline result, that success falls by under six points across the
+    entire trained fault range and still reaches $66\%$ at more than triple that
+    rate, where half the team is lost on average, with no cliff.
   \item \emph{A prospective ethical and regulatory analysis}
     (Section~\ref{sec:ethics}): the capability's dual-use profile, its treatment
     under the GDPR and the EU AI Act (including the military carve-out that

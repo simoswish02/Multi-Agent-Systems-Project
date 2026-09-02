@@ -2,43 +2,37 @@
 \label{sec:experiments}
 
 This section evaluates the single shared policy trained in
-Section~\ref{sec:training}. The questions are deliberately those the
-multi-agent reading of Section~\ref{sec:mas} raised and left open: does one
-policy really generalize across the randomization axes it was trained over
-(Section~\ref{subsec:exp-generalization}); does it degrade gracefully as
-random faults remove members of the team, the project's defining scenario
-(Section~\ref{subsec:exp-faults}); and are the coordination regularities
-claimed as emergent (Section~\ref{subsec:mas-emergence}) visible in
-aggregate behaviour (Section~\ref{subsec:exp-qualitative})? We first fix the
-protocol (Section~\ref{subsec:exp-setup}) and the comparison points
-(Section~\ref{subsec:exp-baselines}), then take the axes one at a time, and
-close with the limitations that bound every claim made here
-(Section~\ref{subsec:exp-discussion}).
+Section~\ref{sec:training}. The questions are deliberately those the multi-agent
+reading of Section~\ref{sec:mas} raised and left open: does one policy really
+generalize across the randomization axes it was trained over; does it degrade
+gracefully as random faults remove members of the team, the project's defining
+scenario; and are the coordination regularities claimed as emergent visible in
+aggregate behaviour? We first fix the protocol and the comparison points, then
+take the axes one at a time, and close with the limitations that bound every
+claim made here.
 
 \subsection{Experimental setup}
 \label{subsec:exp-setup}
 
 \paragraph{Policy under test.}
 Unless stated otherwise, all results use the final checkpoint of the
-$50{,}000$-episode run of Section~\ref{subsec:train-curriculum}, evaluated
-\emph{greedily} ($\varepsilon = 0$), so faults, when present, are the only
-source of stochasticity in an episode. The learning curve of
-Section~\ref{subsec:exp-generalization} additionally revisits the periodic
-checkpoints of the same run.
+$50{,}000$-episode run, evaluated \emph{greedily}
+($\varepsilon = 0$), so faults, when present, are the only source of
+stochasticity in an episode. The learning curve below additionally revisits the
+periodic checkpoints of the same run.
 
 \paragraph{One-factor-at-a-time protocol.}
-The policy was randomized over five environment factors simultaneously, so
-the natural evaluation is a controlled sweep: we vary \emph{one} factor at a
-time and hold the others at a fixed \emph{reference operating point}
---- team size $\nagents = 3$, vision $\rvis = 3$, communication
-$\rcomm = 5$, obstacle density $\rho = 0.2$, step budget $T = 200$, no faults
---- chosen at the centre of the training ranges of Table~\ref{tab:notation}.
-This maps each axis without the exponential cost of a full grid; the two
-interactions we do examine jointly are reported as heatmaps in
-Section~\ref{subsec:exp-qualitative}. Each configuration point is evaluated
-on the \emph{same} bank of $500$ seeds (learning-curve and heatmap points use
-$300$); a seed fixes the obstacle layout, target, spawn corner and --- under
-faults --- the entire fault sequence, so points differ only in the factor
+The policy was randomized over five environment factors simultaneously, so the
+natural evaluation is a controlled sweep: we vary \emph{one} factor at a time and
+hold the others at a fixed \emph{reference operating point}, namely team size
+$\nagents = 3$, vision $\rvis = 3$, communication $\rcomm = 5$, obstacle density
+$\rho = 0.2$, step budget $T = 200$ and no faults, chosen at the centre of the
+training ranges of Table~\ref{tab:notation}. This maps each axis without the
+exponential cost of a full grid; the two interactions we do examine jointly are
+reported as heatmaps in Section~\ref{subsec:exp-qualitative}. Each configuration
+point is evaluated on the \emph{same} bank of $500$ seeds (learning-curve and
+heatmap points use $300$); a seed fixes the obstacle layout, target, spawn corner
+and, under faults, the entire fault sequence, so points differ only in the factor
 being swept. In every plot the range actually seen in training is drawn on a
 white background and the extrapolation beyond it (\emph{out-of-distribution},
 OOD) on a shaded one.
@@ -47,37 +41,35 @@ OOD) on a shaded one.
 We report the task-level metrics defined in
 Section~\ref{subsec:prob-objective}, plus a standard path-quality measure.
 \emph{Success rate} is the fraction of episodes reaching the target within
-$T\cdot\nagents$ agent-turns, with a Wilson $95\%$ confidence interval for
-the binomial proportion. \emph{Time-to-find} is the number of \emph{rounds}
-elapsed at success, averaged over successful episodes only. The simulator
-advances in agent-turns and every drone consumes one turn per round ---
-wrecks included, since a broken drone's no-op still costs its turn
-(Section~\ref{subsec:prob-fault}) --- so the raw count is divided by
+$T\cdot\nagents$ agent-turns, with a Wilson $95\%$ confidence interval for the
+binomial proportion. \emph{Time-to-find} is the number of \emph{rounds} elapsed
+at success, averaged over successful episodes only. The simulator advances in
+agent-turns and every drone consumes one turn per round, wrecks included since a
+broken drone's no-op still costs its turn, so the raw count is divided by
 $\nagents$. This reports elapsed mission time rather than accumulated drone
 effort, and puts the metric in the same unit as the step budget $T$, against
-which it would otherwise be incomparable. \emph{Coverage}
-is the fraction of free cells the team has discovered at episode end;
-\emph{overlap} is the fraction of team-visited cells visited by more than one
-drone, and \emph{revisits} the mean per-drone re-entries --- the two
-redundancy signatures promised in Section~\ref{subsec:mas-emergence}.
-\emph{SPL} (Success weighted by Path Length; \citealp{anderson2018evaluation})
-weights each success by the ratio of the optimal spawn-to-target distance to
-the finder's actual path length, rewarding \emph{short} solutions and scoring
-failures zero; it is our single scalar for path quality.
+which it would otherwise be incomparable. \emph{Coverage} is the fraction of free
+cells the team has discovered at episode end; \emph{overlap} is the fraction of
+team-visited cells visited by more than one drone, and \emph{revisits} the mean
+per-drone re-entries, the two redundancy signatures promised in
+Section~\ref{subsec:mas-emergence}. \emph{SPL} (Success weighted by Path Length;
+\citealp{anderson2018evaluation}) weights each success by the ratio of the
+optimal spawn-to-target distance to the finder's actual path length, rewarding
+\emph{short} solutions and scoring failures zero; it is our single scalar for
+path quality.
 
 \paragraph{A note on episode return.}
-The shaped return of Table~\ref{tab:reward} is reported alongside these
-metrics but is \emph{not} used to rank configurations, and under faults it is
-actively misleading: a drone that breaks stops paying the per-turn step
-penalty, so removing team members can \emph{raise} the mean return even as
-fewer targets are found. This is precisely the shaping-versus-task
-discrepancy that motivated the success-dominant checkpoint rule of
-Section~\ref{subsec:train-correctness}; we therefore read success rate, not
-return, as the primary metric throughout.
+The shaped return of Table~\ref{tab:reward} is reported alongside these metrics
+but is \emph{not} used to rank configurations, and under faults it is actively
+misleading: a drone that breaks stops paying the per-turn step penalty, so
+removing team members can \emph{raise} the mean return even as fewer targets are
+found. This is precisely the shaping-versus-task discrepancy that motivated the
+success-dominant checkpoint rule of Section~\ref{subsec:train-correctness}; we
+therefore read success rate, not return, as the primary metric throughout.
 
 At the reference operating point the policy reaches the target in $87.6\%$ of
 episodes (Wilson CI $[84.4, 90.2]$), discovering $53.7\%$ of the free space with
-an SPL of $0.541$ --- the anchor every one-factor sweep below passes through. One
+an SPL of $0.541$: the anchor every one-factor sweep below passes through. One
 plotting convention holds throughout: bounded panels are drawn on axes fitted to
 the data plus the confidence band, so that trends of a few points remain legible;
 map coverage is the exception and keeps the full $0\text{--}100\%$ range, its
@@ -90,27 +82,27 @@ seeds.
 Two comparison points frame the results, neither of which is an upper bound.
 
 \paragraph{The single drone (value of cooperation).}
-The $\nagents = 1$ end of the team-size sweep is the natural ``no
-cooperation'' baseline: the same policy, deprived of any teammate to
-coordinate with. It isolates what the team buys over a lone searcher and is
-discussed with the sweep in Section~\ref{subsec:exp-generalization}.
+The $\nagents = 1$ end of the team-size sweep is the natural ``no cooperation''
+baseline: the same policy, deprived of any teammate to coordinate with. It
+isolates what the team buys over a lone searcher and is discussed with the sweep
+below.
 
 \paragraph{BFS auto-navigation (a hybrid skyline).}
 The evaluation-only override of Section~\ref{subsec:arch-tooling} replaces the
-learned action by the first step of a breadth-first shortest path, on the
-drone's \emph{own known map}, whenever that drone already knows where the
-target is. It is a hybrid --- the learned policy still does all the
-\emph{searching}; the planner only optimizes the final \emph{approach} once
-the target has been found --- and it is not an oracle: it plans on partial
-knowledge, and it cannot help an episode in which no drone ever sees the
-target. We use it to separate two competences the success rate conflates:
-finding the target, and travelling to it efficiently. A gap in favour of
-auto-nav localizes a weakness in the policy's homing, not in its search.
+learned action by the first step of a breadth-first shortest path, on the drone's
+\emph{own known map}, whenever that drone already knows where the target is. It
+is a hybrid, since the learned policy still does all the \emph{searching} and the
+planner only optimizes the final \emph{approach} once the target has been found,
+and it is not an oracle: it plans on partial knowledge, and it cannot help an
+episode in which no drone ever sees the target. We use it to separate two
+competences the success rate conflates: finding the target, and travelling to it
+efficiently. A gap in favour of auto-nav localizes a weakness in the policy's
+homing, not in its search.
 
 A uniform-random controller was not run as a separate condition: on a
-$\gridsize\times\gridsize$ map with a single target and a step budget its
-success is a floor far below every operating point reported here, and the
-single-drone and auto-nav references are the informative comparisons.
+$\gridsize\times\gridsize$ map with a single target and a step budget its success
+is a floor far below every operating point reported here, and the single-drone
+and auto-nav references are the informative comparisons.
 
 \subsection{Generalization across randomization axes}
 \label{subsec:exp-generalization}
@@ -147,42 +139,40 @@ Table~\ref{tab:generalization} summarizes all five OFAT axes; we read them in
 three groups.
 
 \paragraph{Team size: cooperation helps, and extrapolates.}
-Adding drones raises success monotonically, from $71.0\%$ for a lone searcher
-to $89.2\%$ at $\nagents = 4$ (Figure~\ref{fig:sweep-nagents}), and --- the
-result worth stressing --- the curve does not break when the team grows
-\emph{past} any size seen in training: $\nagents = 5$ and $6$ reach $89.6\%$
-and $90.4\%$. A single shared network, conditioned only on the scalar team
-size and a per-drone identity (Section~\ref{subsec:arch-context}), thus drives
-teams larger than it ever trained on without retraining or architectural
-change --- the concrete pay-off of parameter sharing plus context conditioning
-argued in Section~\ref{subsec:mas-learning}. SPL climbs alongside success
-($0.33 \to 0.58$ over $1\!\to\!4$, continuing to $0.64$ at $\nagents = 6$):
-more searchers means the target is typically found by whichever drone is
-already nearest, shortening the winning path.
+Adding drones raises success monotonically, from $71.0\%$ for a lone searcher to
+$89.2\%$ at $\nagents = 4$ (Figure~\ref{fig:sweep-nagents}), and, the result
+worth stressing, the curve does not break when the team grows \emph{past} any
+size seen in training: $\nagents = 5$ and $6$ reach $89.6\%$ and $90.4\%$. A
+single shared network, conditioned only on the scalar team size and a per-drone
+identity, thus drives teams larger than it ever trained on without retraining or
+architectural change, which is the concrete pay-off of parameter sharing plus
+context conditioning argued in Section~\ref{subsec:mas-learning}. SPL climbs
+alongside success ($0.33 \to 0.58$ over $1\!\to\!4$, continuing to $0.64$ at
+$\nagents = 6$): more searchers means the target is typically found by whichever
+drone is already nearest, shortening the winning path.
 
 Larger teams are also genuinely \emph{faster}, and not merely more likely to
-succeed. Mission time falls from $84.9$ rounds for a lone searcher to $55.5$
-at $\nagents = 3$ and $50.4$ at $\nagents = 4$, continuing to $42.7$ at
+succeed. Mission time falls from $84.9$ rounds for a lone searcher to $55.5$ at
+$\nagents = 3$ and $50.4$ at $\nagents = 4$, continuing to $42.7$ at
 $\nagents = 6$. The speed-up is real but markedly sublinear: $1.53\times$ at
-$\nagents = 3$ and $1.99\times$ at $\nagents = 6$, a parallel efficiency
-falling from $51\%$ to $33\%$. Doubling the team from three drones to six
-therefore cuts mission time by a further $23\%$ rather than halving it again
---- the quantitative form of the coordination overhead the next paragraph
-makes concrete.
+$\nagents = 3$ and $1.99\times$ at $\nagents = 6$, a parallel efficiency falling
+from $51\%$ to $33\%$. Doubling the team from three drones to six therefore cuts
+mission time by a further $23\%$ rather than halving it again, which is the
+quantitative form of the coordination overhead the next paragraph makes
+concrete.
 
 Two costs temper the picture, both visible in Figure~\ref{fig:sweep-nagents}.
-Mean return \emph{falls} as the team grows (more drones each paying the step
-penalty), which is why return is not our ranking metric. And same-cell
-collisions rise steeply with $\nagents$ --- an unavoidable consequence of a
-shared spawn corner and a bounded map, where more bodies contend for the same
-early cells. Congestion is precisely the mechanism behind the diminishing
-returns reported above: an added searcher spends an increasing share of the
-episode contending for, and re-sweeping, ground the team already holds. The
-two redundancy statistics separate the individual from the collective view of
-this --- per-drone revisits fall and then flatten (Section~\ref{subsec:exp-qualitative}),
-each drone individually more efficient, while team overlap rises
-($18.5\% \to 37.0\%$ from $\nagents = 2$ to $6$, the team collectively more
-wasteful). Coverage confirms the ceiling: it plateaus at
+Mean return \emph{falls} as the team grows, since more drones each pay the step
+penalty, which is why return is not our ranking metric. And same-cell collisions
+rise steeply with $\nagents$, an unavoidable consequence of a shared spawn corner
+and a bounded map, where more bodies contend for the same early cells. Congestion
+is precisely the mechanism behind the diminishing returns reported above: an
+added searcher spends an increasing share of the episode contending for, and
+re-sweeping, ground the team already holds. The two redundancy statistics
+separate the individual from the collective view of this: per-drone revisits fall
+and then flatten, each drone individually more efficient, while team overlap
+rises ($18.5\% \to 37.0\%$ from $\nagents = 2$ to $6$), the team collectively
+more wasteful. Coverage confirms the ceiling: it plateaus at
 $53.7\text{--}55.2\%$ from $\nagents = 3$ on, so beyond that point extra drones
 mostly duplicate each other's ground rather than extend the swept region.
 
@@ -193,60 +183,58 @@ mostly duplicate each other's ground rather than extend the swept region.
 ($1\!\le\!\nagents\!\le\!4$), red squares the OOD extrapolation, shaded bands the
 Wilson $95\%$ CI (success) or $\pm1$ standard deviation (return). Success and SPL
 improve monotonically and extend cleanly beyond the trained maximum, and mission
-time falls from $84.9$ to $42.7$ rounds --- a real but sublinear speed-up. The
-cost is congestion (collisions) at the shared spawn corner, while per-drone
-revisits fall: the division-of-labour signature of
-Section~\ref{subsec:exp-qualitative}.}
+time falls from $84.9$ to $42.7$ rounds, a real but sublinear speed-up. The cost
+is congestion (collisions) at the shared spawn corner, while per-drone revisits
+fall: the division-of-labour signature discussed below.}
 \label{fig:sweep-nagents}
 \end{figure}
 
 \paragraph{Vision and communication: robust, with a telling asymmetry.}
-Both sensing axes generalize flatly (Table~\ref{tab:generalization}). Vision
-has the intuitive effect on \emph{coverage} --- a wider window discovers more
-of the map per step, and coverage rises monotonically from $46.5\%$ at
-$\rvis=1$ to $69.5\%$ at $\rvis=8$ --- yet success peaks around
-$\rvis = 3\text{--}4$ ($88.2\%$) and drifts gently down thereafter, in and out of
-distribution alike, because past a point the bottleneck is deciding \emph{where}
-to go, not seeing farther.
-Communication is the more interesting axis: success is essentially
-\emph{flat} across the entire range, $87\text{--}89\%$, and --- strikingly ---
-severing communication entirely ($\rcomm = 0$, an OOD probe) costs almost
-nothing in success ($87.6\%$). What communication does buy is
-\emph{efficiency}. Path quality improves steadily (SPL $0.49 \to 0.59$ from
-$\rcomm = 0$ to $16$), redundancy falls as shared maps let drones avoid
-re-covering each other's ground, and --- the effect the per-round metric
-brings out --- the team is markedly \emph{quicker}: mission time drops from
-$61.7$ rounds with communication severed to $49.6$ at $\rcomm = 10$, a $20\%$
-saving, before flattening. Communication thus governs how efficiently the
-team searches, not whether it succeeds. We take this
-finding up directly as an ablation in Section~\ref{subsec:exp-ablations}, as
-it bears on the coordination analysis of Section~\ref{subsec:mas-coordination}.
+Both sensing axes generalize flatly (Table~\ref{tab:generalization}). Vision has
+the intuitive effect on \emph{coverage}, a wider window discovering more of the
+map per step, so coverage rises monotonically from $46.5\%$ at $\rvis=1$ to
+$69.5\%$ at $\rvis=8$; yet success peaks around $\rvis = 3\text{--}4$ ($88.2\%$)
+and drifts gently down thereafter, in and out of distribution alike, because past
+a point the bottleneck is deciding \emph{where} to go, not seeing farther.
+Communication is the more interesting axis: success is essentially \emph{flat}
+across the entire range, $87\text{--}89\%$, and, strikingly, severing
+communication entirely ($\rcomm = 0$, an OOD probe) costs almost nothing in
+success ($87.6\%$). What communication does buy is \emph{efficiency}. Path
+quality improves steadily (SPL $0.49 \to 0.59$ from $\rcomm = 0$ to $16$),
+redundancy falls as shared maps let drones avoid re-covering each other's ground,
+and, in the effect the per-round metric brings out, the team is markedly
+\emph{quicker}: mission time drops from $61.7$ rounds with communication severed
+to $49.6$ at $\rcomm = 10$, a $20\%$ saving, before flattening. Communication
+thus governs how efficiently the team searches, not whether it succeeds. We take
+this finding up directly as an ablation in
+Section~\ref{subsec:exp-ablations}, as it bears on the coordination analysis of
+Section~\ref{subsec:mas-coordination}.
 
 \paragraph{Density and budget: the difficulty axes.}
 Obstacle density is the one factor that dominates the task
 (Figure~\ref{fig:sweep-density}). Success falls smoothly from near-perfect in
 open fields ($99.0\%$ at $\rho = 0$, $96.2\%$ at the trained floor
 $\rho = 0.10$) to $53.4\%$ at the trained ceiling $\rho = 0.30$, and then
-collapses out-of-distribution to $34.6\%$ and $24.2\%$ at $\rho = 0.35, 0.40$
---- the only axis whose extrapolation fails outright. The mechanism is legible
-in the companion panels: as clutter rises, corridors narrow, drones are
-funnelled together (collisions and per-drone revisits climb sharply), coverage
-drops, and SPL falls as detours lengthen the winning path. The step budget
-behaves as expected of a pure time constraint: success rises with $T$
-($49.0\%$ at $T=50$ to $89.8\%$ at $T=300$) with diminishing returns, since a
-generous budget only helps episodes that were close to succeeding anyway.
+collapses out-of-distribution to $34.6\%$ and $24.2\%$ at $\rho = 0.35, 0.40$,
+the only axis whose extrapolation fails outright. The mechanism is legible in the
+companion panels: as clutter rises, corridors narrow, drones are funnelled
+together (collisions and per-drone revisits climb sharply), coverage drops, and
+SPL falls as detours lengthen the winning path. The step budget behaves as
+expected of a pure time constraint: success rises with $T$ ($49.0\%$ at $T=50$ to
+$89.8\%$ at $T=300$) with diminishing returns, since a generous budget only helps
+episodes that were close to succeeding anyway.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\textwidth]{fig_density.png}
 \caption{Sensitivity to obstacle density $\rho$: the one axis that governs
 difficulty, and the one whose OOD extrapolation (shaded, $\rho > 0.30$) degrades
-sharply. The redundancy panel makes the mechanism concrete --- clutter funnels the
-team together, so collisions and per-drone revisits climb as success and path
+sharply. The redundancy panel makes the mechanism concrete, since clutter funnels
+the team together, so collisions and per-drone revisits climb as success and path
 quality fall. Time-to-find is the one panel not to read as a difficulty signal:
 averaged over successful episodes only, its drop at the OOD densities ($66.4$
-rounds at $\rho = 0.30$ against $21.1$ at $\rho = 0.40$) is survivorship --- at
-$24.2\%$ success the few episodes that still finish are those whose target
+rounds at $\rho = 0.30$ against $21.1$ at $\rho = 0.40$) is survivorship, since
+at $24.2\%$ success the few episodes that still finish are those whose target
 happened to lie near the spawn corner.}
 \label{fig:sweep-density}
 \end{figure}
@@ -254,23 +242,20 @@ happened to lie near the spawn corner.}
 \paragraph{Learning curve.}
 Re-evaluating the periodic checkpoints at the reference operating point
 (Figure~\ref{fig:epoch}, Appendix~\ref{app:figures}) shows success rising to a
-plateau around
-$80\text{--}85\%$ by roughly episode $25{,}000$ and holding, with SPL
-continuing to inch up afterward --- the policy keeps refining \emph{how} it
-reaches targets after the \emph{whether} has largely converged. The
-intermediate dip around episodes $17{,}500\text{--}22{,}500$ (success
-$68\text{--}70\%$) falls in the stretch where exploration has long since
-floored --- $\varepsilon$ hits $0.05$ at episode $5{,}990$ --- while the
-learning rate is still $67\text{--}82\%$ of its peak on the cosine schedule
-(Figure~\ref{fig:schedules}): large updates against a nearly greedy,
-self-generated state distribution. It recovers without intervention as the
-annealing proceeds; the in-training evaluation logged online
-(Figure~\ref{fig:training-eval}), which uses a different instance bank and was
-recorded independently of these re-evaluations, places its own local minima in
-the same stretch, at episodes $16{,}000$ and $21{,}000$. This curve is the
+plateau around $80\text{--}85\%$ by roughly episode $25{,}000$ and holding, with
+SPL continuing to inch up afterward: the policy keeps refining \emph{how} it
+reaches targets after the \emph{whether} has largely converged. The intermediate
+dip around episodes $17{,}500\text{--}22{,}500$ (success $68\text{--}70\%$) falls
+in the stretch where exploration has long since floored, $\varepsilon$ hitting
+$0.05$ at episode $5{,}990$, while the learning rate is still
+$67\text{--}82\%$ of its peak on the cosine schedule: large updates against a
+nearly greedy, self-generated state distribution. It recovers without
+intervention as the annealing proceeds, and the in-training evaluation logged
+online (Figure~\ref{fig:training-eval}), which uses a different instance bank and
+was recorded independently of these re-evaluations, places its own local minima
+in the same stretch, at episodes $16{,}000$ and $21{,}000$. This curve is the
 greedy, $300$-seed complement to the online training scalars of
-Section~\ref{subsec:train-infra} (Figures~\ref{fig:training-curves}
-and~\ref{fig:training-eval}).
+Figure~\ref{fig:training-curves}.
 
 \subsection{Fault robustness}
 \label{subsec:exp-faults}
@@ -279,10 +264,9 @@ This is the project's headline experiment: how does a policy trained over
 $\pfault \in [0, 0.003]$ behave as drones are actually lost mid-mission?
 Figure~\ref{fig:fault} and Table~\ref{tab:fault} sweep the per-turn fault
 probability from the fault-free reference out to $\pfault = 0.01$, more than
-triple the trained maximum --- a regime in which, over $200$ rounds, a drone's
-survival probability is only $0.99^{200} \approx 0.13$ and, at the reference
-team size $\nagents = 3$, roughly $1.5$ drones are lost per episode on
-average.
+triple the trained maximum: a regime in which, over $200$ rounds, a drone's
+survival probability is only $0.99^{200} \approx 0.13$ and, at the reference team
+size $\nagents = 3$, roughly $1.5$ drones are lost per episode on average.
 
 \begin{table}[t]
 \centering
@@ -316,26 +300,27 @@ fault handling.}
 \paragraph{Graceful degradation.}
 The central result is that degradation is gentle and monotone. Across the
 \emph{entire} trained range the success rate falls only from $87.6\%$ to
-$82.0\%$ --- under six points --- even though by $\pfault = 0.003$ the team is
-losing, on average, $0.58$ of its three drones per episode. Pushed to the
-$3.3\times$ OOD point $\pfault = 0.01$, success degrades to $66.2\%$ with
-$1.51$ drones lost: the policy sheds, on average, \emph{half} the team and
-still completes two missions in three. There is no cliff. This is the redundancy
-argued in Section~\ref{subsec:mas-resilience} made quantitative --- any
-surviving drone can complete the search, so the loss of some drones removes
-capacity, not the mission --- and it holds under a fault rate the policy was
-never trained on, evidence that the decentralized fault handling generalizes
-rather than memorizing the training range.
+$82.0\%$, under six points, even though by $\pfault = 0.003$ the team is losing,
+on average, $0.58$ of its three drones per episode. Pushed to the $3.3\times$ OOD
+point $\pfault = 0.01$, success degrades to $66.2\%$ with $1.51$ drones lost: the
+policy sheds, on average, \emph{half} the team and still completes two missions
+in three. There is no cliff. This is the redundancy argued in
+Section~\ref{subsec:mas-resilience} made quantitative, since any surviving drone
+can complete the search, so the loss of some drones removes capacity rather than
+the mission; and it holds under a fault rate the policy was never trained on,
+evidence that the decentralized fault handling generalizes rather than memorizing
+the training range.
 
 \paragraph{Return rises while success falls.}
 Table~\ref{tab:fault} and the training scalars make the shaping artefact
 concrete: mean return \emph{rises} across the whole trained fault range
 ($71.2 \to 86.4$, peaking at $89.8$ before ever-shorter episodes pull it back
-down) because wrecked drones stop incurring step penalties. Read naively, the reward says faults \emph{help}; read correctly,
-success says they hurt, slowly. The experiment is thus also a validation of
-the success-dominant model-selection rule of
-Section~\ref{subsec:train-correctness}: had we selected checkpoints on return,
-we would have preferred policies that let drones die quietly.
+down) because wrecked drones stop incurring step penalties. Read naively, the
+reward says faults \emph{help}; read correctly, success says they hurt, slowly.
+The experiment is thus also a validation of the success-dominant
+model-selection rule of Section~\ref{subsec:train-correctness}: had we selected
+checkpoints on return, we would have preferred policies that let drones die
+quietly.
 
 \begin{figure}[t]
 \centering
@@ -354,18 +339,16 @@ The mean loss counts of Table~\ref{tab:fault} average over very different
 episodes, so Figure~\ref{fig:nbroken} opens them up. Panel~(a) shows the full
 composition: even at the trained maximum $\pfault = 0.003$, a majority of
 episodes ($59\%$) still lose \emph{no} drone, and total wipe-outs are rare
-($3\%$); at the $3.3\times$ OOD point the picture inverts, with only $24\%$
-of episodes fault-free and $27\%$ losing the entire team. Panel~(b)
-conditions success on how many drones survived, and this is where the
-graceful-degradation claim becomes mechanical rather than rhetorical. A team
-that finishes intact succeeds $93.9\%$ of the time; losing one drone costs
-$14$ points ($79.8\%$), and even a lone survivor still finds the target in
-$52.6\%$ of episodes --- roughly the single-drone baseline of
-Section~\ref{subsec:exp-baselines}, reached from a worse starting position.
-The $0\%$ bar at zero survivors is definitional, not a policy failure: an
-all-dead team truncates the episode (Section~\ref{subsec:prob-fault}), so
-those $200$ episodes are lost to the environment rather than to the policy.
-
+($3\%$); at the $3.3\times$ OOD point the picture inverts, with only $24\%$ of
+episodes fault-free and $27\%$ losing the entire team. Panel~(b) conditions
+success on how many drones survived, and this is where the graceful-degradation
+claim becomes mechanical rather than rhetorical. A team that finishes intact
+succeeds $93.9\%$ of the time; losing one drone costs $14$ points ($79.8\%$), and
+even a lone survivor still finds the target in $52.6\%$ of episodes, roughly the
+single-drone baseline reached from a worse starting position. The $0\%$ bar at
+zero survivors is definitional, not a policy failure: an all-dead team truncates
+the episode, so those $200$ episodes are lost to the environment rather than to
+the policy.
 
 \begin{figure}[t]
 \centering
@@ -376,60 +359,58 @@ episodes by number of drones lost: within the trained range most episodes
 still finish with a complete team, while at the OOD point $\pfault = 0.01$
 total wipe-outs become common. \emph{(b)} Success rate conditioned on the
 number of survivors, pooled over all fault levels. Degradation with team
-attrition is gradual --- a single surviving drone still succeeds in over half
-of its episodes --- which is what makes the aggregate curve of
+attrition is gradual, a single surviving drone still succeeding in over half
+of its episodes, which is what makes the aggregate curve of
 Figure~\ref{fig:fault} smooth. The zero-survivor bar is $0\%$ by
 construction: an all-dead team truncates the episode.}
 \label{fig:nbroken}
 \end{figure}
 
 \paragraph{Where the small gap lives.}
-The auto-nav hybrid tracks the policy closely and a constant $2\text{--}3$
-points above it, at \emph{every} fault level (Figure~\ref{fig:fault}). Because
-auto-nav changes only the homing phase, this near-constant offset says the
-policy's residual weakness is a slightly sub-optimal final approach --- not a
-failure to handle faults, which would have widened the gap as $\pfault$ grew.
-Fault tolerance is a property the learned policy already has; efficient homing
-is the part a planner can still improve.
+The auto-nav hybrid tracks the policy closely and a constant $2\text{--}3$ points
+above it, at \emph{every} fault level (Figure~\ref{fig:fault}). Because auto-nav
+changes only the homing phase, this near-constant offset says the policy's
+residual weakness is a slightly sub-optimal final approach, not a failure to
+handle faults, which would have widened the gap as $\pfault$ grew. Fault
+tolerance is a property the learned policy already has; efficient homing is the
+part a planner can still improve.
 
 \paragraph{The belief-lag question.}
 Section~\ref{subsec:mas-resilience} identified the interval between a fault and a
-survivor's discovery of it --- governed by $\rcomm$ --- as the system's ``window
-of miscoordination''. Measuring it directly needs a joint $\pfault \times \rcomm$
+survivor's discovery of it, governed by $\rcomm$, as the system's ``window of
+miscoordination''. Measuring it directly needs a joint $\pfault \times \rcomm$
 sweep with per-step trajectory logs, which the present episode-summary harness
-does not record (Section~\ref{subsec:exp-discussion}); an indirect bound is
-available meanwhile. Since success is nearly insensitive to $\rcomm$ even without
-faults (Section~\ref{subsec:exp-generalization}) --- what fusion spreads is, on
-this task, largely redundant with what a drone sees for itself --- the additional
+does not record; an indirect bound is available meanwhile. Since success is
+nearly insensitive to $\rcomm$ even without faults, what fusion spreads being on
+this task largely redundant with what a drone sees for itself, the additional
 value of faster fault-news propagation is likely second-order for the find rate,
 though it may matter more for path quality.
 
 \subsection{Ablation: the role of communication}
 \label{subsec:exp-ablations}
 
-The communication axis of Section~\ref{subsec:exp-generalization} doubles as a
-clean ablation, because $\rcomm = 0$ removes map fusion entirely without
-retraining or changing anything else. Figure~\ref{fig:sweep-comm} isolates
-it. Disabling communication leaves the success rate essentially unchanged
-($87.6\%$ at $\rcomm = 0$ against $87\text{--}90\%$ over the whole range), and
-its effect on the other metrics is real but modest: SPL improves by about
-$0.09$ and per-drone revisits fall as range grows, because drones that can
-read each other's maps waste less effort re-covering explored ground.
+The communication axis doubles as a clean ablation, because $\rcomm = 0$ removes
+map fusion entirely without retraining or changing anything else.
+Figure~\ref{fig:sweep-comm} isolates it. Disabling communication leaves the
+success rate essentially unchanged ($87.6\%$ at $\rcomm = 0$ against
+$87\text{--}90\%$ over the whole range), and its effect on the other metrics is
+real but modest: SPL improves by about $0.09$ and per-drone revisits fall as
+range grows, because drones that can read each other's maps waste less effort
+re-covering explored ground.
 
 The reading matters for the multi-agent analysis. It does \emph{not} say
-communication is useless; it says that on this task, with monotone
-accumulating maps and a strong dispersion incentive
-(Section~\ref{subsec:prob-objective}), most of the coordination is carried by
+communication is useless; it says that on this task, with monotone accumulating
+maps and a strong dispersion incentive, most of the coordination is carried by
 the \emph{environment-mediated, stigmergic} channel of
-Section~\ref{subsec:mas-coordination} --- drones spreading out because regions
-they or teammates have swept are made unrewarding --- rather than by the
-\emph{direct} map-fusion channel. Communication refines coordination
-(shorter, less redundant paths); it does not, here, create it. This is a
-concrete instance of the coordination-without-protocols theme of
-Section~\ref{sec:mas}, and an honest limitation of the current reward design:
-a task that genuinely required information sharing (a target visible only from
-afar, say, or heterogeneous sensing) would exercise the fusion channel far
-harder than target-in-a-maze search does.
+Section~\ref{subsec:mas-coordination}, drones spreading out because regions they
+or teammates have swept are made unrewarding, rather than by the \emph{direct}
+map-fusion channel. Communication refines coordination, giving shorter and less
+redundant paths; it does not, here, create it. This is a concrete instance of the
+coordination-without-protocols theme of Section~\ref{sec:mas}, and an honest
+limitation of the current reward design: a task that genuinely required
+information sharing (a target visible only from afar, say, or heterogeneous
+sensing) would exercise the fusion channel far harder than target-in-a-maze
+search does.
 
 \begin{figure}[t]
 \centering
@@ -442,48 +423,45 @@ find rate.}
 \label{fig:sweep-comm}
 \end{figure}
 
-Two further ablations named in the analysis --- removing $\hat n_i$ from the
-context vector (Section~\ref{subsec:arch-context}) and switching the shared
-terminal reward for an individual one (Section~\ref{subsec:prob-objective})
---- change the \emph{training} objective and so require retraining a policy
-each; they are beyond the single-checkpoint scope of this evaluation and are
-noted as future work in Section~\ref{sec:conclusions}.
+Two further ablations named in the analysis, removing $\hat n_i$ from the context
+vector and switching the shared terminal reward for an individual one, change the
+\emph{training} objective and so require retraining a policy each; they are
+beyond the single-checkpoint scope of this evaluation and are noted as future
+work in Section~\ref{sec:conclusions}.
 
 \subsection{Emergent coordination signatures}
 \label{subsec:exp-qualitative}
 
 Section~\ref{subsec:mas-emergence} claimed three measurable signatures of
 emergent division of labour and committed to testing them here: complementary
-coverage (low inter-drone overlap), inter-drone distance distributions over
-time, and post-fault re-covering latency. We report the first, which the
+coverage (low inter-drone overlap), inter-drone distance distributions over time,
+and post-fault re-covering latency. We report the first, which the
 episode-summary metrics capture directly, and are explicit about the two that
 require trajectory-level logging.
 
 \paragraph{Complementary coverage is real and quantified.}
-Across the team-size sweep, the overlap between drones' swept regions stays
-low: at $\nagents = 4$ only $29.6\%$ of team-visited cells are entered by more
-than one drone, so roughly seven in ten cells are each the responsibility of a
-single searcher. More tellingly, \emph{per-drone} revisits fall as the team grows --- from $13.9$
-at $\nagents = 1$ to about $8.8$ from $\nagents = 4$ on, where they flatten ---
-even though total collisions rise: each drone individually wastes less effort
-re-treading its own ground as the map is partitioned among more searchers.
-This is exactly the complementarity Section~\ref{subsec:mas-emergence}
-predicted from local rules alone --- no region is ever assigned --- and it is
-the aggregate footprint of the identity-conditioned sector partition the
-shared policy learned.
+Across the team-size sweep, the overlap between drones' swept regions stays low:
+at $\nagents = 4$ only $29.6\%$ of team-visited cells are entered by more than
+one drone, so roughly seven in ten cells are each the responsibility of a single
+searcher. More tellingly, \emph{per-drone} revisits fall as the team grows, from
+$13.9$ at $\nagents = 1$ to about $8.8$ from $\nagents = 4$ on, where they
+flatten, even though total collisions rise: each drone individually wastes less
+effort re-treading its own ground as the map is partitioned among more searchers.
+This is exactly the complementarity predicted from local rules alone, no region
+ever being assigned, and it is the aggregate footprint of the
+identity-conditioned sector partition the shared policy learned.
 
 \paragraph{Two interactions, read as heatmaps.}
 Figure~\ref{fig:heatmaps} confirms on $2$-D grids what the OFAT sweeps imply
-marginally. Team size $\times$ communication (left) shows success governed
-almost entirely by $\nagents$, with the $\rcomm$ direction nearly flat at
-every team size --- the communication finding of
-Section~\ref{subsec:exp-ablations}, now visibly independent of team size.
+marginally. Team size $\times$ communication (left) shows success governed almost
+entirely by $\nagents$, with the $\rcomm$ direction nearly flat at every team
+size: the communication finding above, now visibly independent of team size.
 Vision $\times$ density (right) shows the reverse: density sets the achievable
-success band and vision helps appreciably only in open maps, where seeing
-farther translates into faster coverage; in dense clutter the extra sight
-lines are wasted on walls. The two dominant factors of the whole study --- how
-\emph{many} drones and how \emph{cluttered} the world --- are exactly the two
-that these interaction grids single out.
+success band and vision helps appreciably only in open maps, where seeing farther
+translates into faster coverage, while in dense clutter the extra sight lines are
+wasted on walls. The two dominant factors of the whole study, how \emph{many}
+drones and how \emph{cluttered} the world, are exactly the two that these
+interaction grids single out.
 
 \begin{figure}[t]
 \centering
@@ -503,47 +481,45 @@ factors.}
 \end{figure}
 
 \paragraph{What we do not yet measure.}
-The other two signatures --- how pairwise inter-drone distances evolve within an
+The other two signatures, how pairwise inter-drone distances evolve within an
 episode (the radial-dispersion claim) and the latency with which survivors
-re-cover a wrecked drone's sector --- are properties of the \emph{joint
-trajectory over time}, and the current harness records only end-of-episode
-aggregates; measuring them needs per-step position logging and a re-run of the
-fault sweep with trajectories retained. The emergence claims of
-Section~\ref{subsec:mas-emergence} therefore rest, at present, on the
+re-cover a wrecked drone's sector, are properties of the \emph{joint trajectory
+over time}, and the current harness records only end-of-episode aggregates;
+measuring them needs per-step position logging and a re-run of the fault sweep
+with trajectories retained. The emergence claims therefore rest, at present, on the
 coverage-complementarity signature above and on qualitative checkpoint
-inspection --- and no further.
+inspection, and no further.
 
 \subsection{Discussion and limitations}
 \label{subsec:exp-discussion}
 
 The evaluation supports a bounded but clear claim: a single shared policy,
-trained with domain randomization and context conditioning, generalizes
-across team size, sensing and communication (including beyond its trained
-ranges), degrades gracefully under a fault process it only partially saw in
-training, and exhibits at least one measurable signature of emergent
-division of labour. The limits of that claim should be stated as plainly as
-the claim itself, since Section~\ref{sec:ethics} leans on them.
+trained with domain randomization and context conditioning, generalizes across
+team size, sensing and communication (including beyond its trained ranges),
+degrades gracefully under a fault process it only partially saw in training, and
+exhibits at least one measurable signature of emergent division of labour. The
+limits of that claim should be stated as plainly as the claim itself, since
+Section~\ref{sec:ethics} leans on them.
 
 \emph{Simulation and abstraction.} Everything here is a $\gridsize\times
 \gridsize$ occupancy grid with four-connected moves, noiseless local sensing and
 instantaneous range-limited fusion. Continuous dynamics, sensor noise,
-localization error, communication latency and packet loss --- each of which would
-stress the very mechanisms (map fusion, beacon detection) the policy relies on
---- are absent, and no sim-to-real transfer is claimed or tested.
+localization error, communication latency and packet loss, each of which would
+stress the very mechanisms (map fusion, beacon detection) the policy relies on,
+are absent, and no sim-to-real transfer is claimed or tested.
 
 \emph{The fault model is benign.} Faults are i.i.d.\ across drones and turns,
-independent of state and action, and produce inert, non-blocking wrecks
-(Section~\ref{subsec:prob-fault}). Correlated failures, faults that block
-passage, and an \emph{adversary} choosing when and whom to disable are all
-outside the model --- and an adversary is exactly the case the security
-discussion of Section~\ref{sec:ethics} must contend with.
+independent of state and action, and produce inert, non-blocking wrecks.
+Correlated failures, faults that block passage, and an \emph{adversary} choosing
+when and whom to disable are all outside the model, and an adversary is exactly
+the case the security discussion of the next section must contend with.
 
 \emph{Statistical, not formal, evidence.} Success rates on $500$ seeds with
 Wilson intervals bound sampling error, not worst-case behaviour: nothing here
 certifies how the opaque learned policy acts on a specific unseen instance, a gap
 Section~\ref{subsec:eth-responsibility} returns to. The OOD probes show graceful
-extrapolation on the axes tested but do not guarantee it in general --- density
-already shows where extrapolation fails.
+extrapolation on the axes tested but do not guarantee it in general, density
+already showing where extrapolation fails.
 
 \emph{Instrumentation gaps.} The belief-lag / fault$\times$comm interaction and
 two of the three emergence signatures were defined but not measured, for want of

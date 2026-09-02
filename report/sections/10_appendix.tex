@@ -12,7 +12,7 @@ Table~\ref{tab:reward}.
 
 \begin{table}[h]
 \centering
-\small
+\footnotesize
 \begin{tabular}{lll}
 \toprule
 \textbf{Parameter} & \textbf{Value} & \textbf{Notes} \\
@@ -111,7 +111,7 @@ In-training eval $\varepsilon$ & $0.05$               & near-greedy \\
 Periodic checkpoint save   & every $2{,}500$ episodes & learning-curve axis \\
 Parallel watcher eval      & $200$ seeded episodes/checkpoint & crash-safe second opinion \\
 OFAT sweep seeds           & $500$ per point          & Section~\ref{sec:experiments} \\
-Learning-curve / heatmap seeds & $300$ per point      & Section~\ref{sec:experiments} \\
+Learning-curve / heatmap seeds & $300$ per point      & idem \\
 \bottomrule
 \end{tabular}
 \caption{Evaluation protocol (Sections~\ref{subsec:train-infra},
@@ -128,20 +128,21 @@ The code is organized as a small set of packages behind three entry points.
 
 \paragraph{Module map.}
 \begin{itemize}[leftmargin=1.5em]
-  \item \texttt{env/} --- the environment package: \texttt{grid\_env.py}
+  \item \texttt{env/}: the environment package, with \texttt{grid\_env.py}
     (the \texttt{DroneSearchEnv}: generation with BFS reachability, sequential
     \texttt{step\_agent}, reward, beacon detection, communication fusion) and
     \texttt{utils.py} (BFS helpers and the eval-only \texttt{auto\_nav\_action}).
-  \item \texttt{agents/} --- \texttt{networks.py} (GlobalMapCNN, LocalCNN,
+  \item \texttt{agents/}: \texttt{networks.py} (GlobalMapCNN, LocalCNN,
     dueling head) and \texttt{dqn\_agent.py} (Double-DQN agent: action
     selection, learning step, checkpoint I/O).
-  \item \texttt{training/} --- \texttt{train.py} (curriculum loop, domain
+  \item \texttt{training/}: \texttt{train.py} (curriculum loop, domain
     randomization, $n$-step windows, in-training evaluation).
-  \item \texttt{gui/} --- the renderer for the \texttt{play}, \texttt{eval},
+  \item \texttt{gui/}: the renderer for the \texttt{play}, \texttt{eval}
     and \texttt{simulate} modes (fault slider, auto-nav toggle).
-  \item \texttt{testing/} --- \texttt{evaluate\_policy.py} (the OFAT / fault /
-    heatmap / epoch harness) and \texttt{analysis.ipynb} (figure generation).
-  \item Top level --- \texttt{main.py} (all runtime modes),
+  \item \texttt{testing/}: \texttt{evaluate\_\allowbreak policy.py}, the OFAT,
+    fault, heatmap and epoch harness, and \texttt{analysis.\allowbreak ipynb}
+    for figure generation.
+  \item Top level: \texttt{main.py} (all runtime modes),
     \texttt{eval\_checkpoints.py} (batch and \texttt{--watch} checkpoint
     ranking), and \texttt{configs/default.yaml} (single source of truth).
 \end{itemize}
@@ -176,15 +177,15 @@ python testing/evaluate_policy.py --axis epoch    --seeds 300
 \section{Additional Figures}
 \label{app:figures}
 
-For completeness this appendix collects four figures referenced from the body but
+For completeness this appendix collects the figures referenced from the body but
 not shown there. Figures~\ref{fig:app-vision} and~\ref{fig:app-maxsteps} give the
-two one-factor sweeps summarized in Table~\ref{tab:generalization} --- the
-vision-radius and step-budget axes --- with the six panels of each following the
+two one-factor sweeps summarized in Table~\ref{tab:generalization}, namely the
+vision-radius and step-budget axes, with the six panels of each following the
 layout of Figures~\ref{fig:sweep-nagents} and~\ref{fig:sweep-density}.
 Figures~\ref{fig:schedules}--\ref{fig:epoch} then document the training run of
 Section~\ref{sec:training}: its two per-episode schedules, the in-training
 evaluation that drives checkpoint selection, and the checkpoint-level learning
-curve discussed in Section~\ref{subsec:exp-generalization}.
+curve.
 
 \begin{figure}[h]
 \centering
@@ -215,7 +216,7 @@ $5{,}990$; \emph{(b)} the learning rate warms up over the first $10\%$ of
 episodes to $5\times10^{-4}$, then anneals cosine-wise to $10^{-6}$. The two are
 deliberately out of phase: exploration has essentially finished annealing while
 the learning rate is still near its peak, so the bulk of the high-learning-rate
-budget is spent on a near-greedy --- and therefore task-relevant --- state
+budget is spent on a near-greedy, and therefore task-relevant, state
 distribution.}
 \label{fig:schedules}
 \end{figure}
@@ -227,9 +228,9 @@ distribution.}
 episodes on the fixed bank of $20$ seeded instances that drives checkpoint
 selection; \emph{(a)} success rate and \emph{(b)} mean return, best values
 circled. These levels are not comparable with those of
-Section~\ref{sec:experiments}: this bank samples the \emph{full} randomization
-ranges --- solo drones, $\rvis{=}1$, faults active --- whereas
-Section~\ref{sec:experiments} measures at the reference operating point. The
+Section~\ref{sec:experiments}, since this bank samples the \emph{full}
+randomization ranges (solo drones, $\rvis{=}1$, faults active) whereas the
+evaluation there measures at the reference operating point. The
 $5$-point sawtooth in \emph{(a)} is the quantization of a $20$-instance bank,
 which is the noise the strict-improvement selection rule is designed not to
 chase. Both panels flatten by around episode $7{,}000$.}

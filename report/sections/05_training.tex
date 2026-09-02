@@ -2,12 +2,9 @@
 \label{sec:training}
 
 This section describes how the shared policy is trained: the curriculum and
-domain-randomization protocol (Section~\ref{subsec:train-curriculum}), the
-exploration and learning-rate schedules
-(Section~\ref{subsec:train-schedules}), the learning-side decisions that the
-fault model makes unusually delicate
-(Section~\ref{subsec:train-correctness}), and the infrastructure that makes a
-long run reproducible and resumable (Section~\ref{subsec:train-infra}).
+domain-randomization protocol, the exploration and learning-rate schedules, the
+learning-side decisions that the fault model makes unusually delicate, and the
+infrastructure that makes a long run reproducible and resumable.
 
 \subsection{Curriculum and domain randomization}
 \label{subsec:train-curriculum}
@@ -19,7 +16,7 @@ team size, obstacle density, per-drone step budget, an exploration reset, and
 its own randomization ranges; anything not overridden falls back to the global
 settings. Two conventions turn the list into a staging tool. A phase with zero
 episodes is skipped, so alternative stagings are kept in the file and enabled by
-editing a single number --- the exact shape of every run is versioned alongside
+editing a single number, and the exact shape of every run is versioned alongside
 the code. And phase boundaries interact cleanly with resuming: a restarted run
 skips completed phases, resumes the active one at its saved episode index, and
 suppresses that phase's exploration reset, keeping the checkpoint's annealed
@@ -32,25 +29,23 @@ The curriculum machinery is nevertheless part of the contribution: it is what
 made those iterations cheap.
 
 At the start of every episode the loop samples
-$\theta = (\rvis, \rcomm, \nagents, \rho, \pfault)$ --- integers and floats
-uniformly from their ranges --- applies it to the environment via
-\texttt{set\_domain\_params}, and only then resets
-(Section~\ref{subsec:arch-env}). The ranges are wide by design. Vision spans
-myopic ($\rvis{=}1$: a $3\times3$ window) to far-sighted ($\rvis{=}6$);
-communication spans nearly-isolated to easily-connected teams; team size spans a
-single drone --- where cooperation is moot and the policy must search alone ---
-to four; obstacle density spans open fields to cluttered mazes; and the fault
-range spans ``faults never happen'' to ``losing roughly half the team over an
-episode is ordinary'' (Section~\ref{subsec:prob-fault}). The policy is therefore
-forced to be simultaneously a competent solo searcher, a cooperative team
-member, and a survivor of team collapse --- with the context vector
-(Section~\ref{subsec:arch-context}) telling it, at every turn, which of these
-regimes it currently inhabits. Per-episode resampling also acts as an implicit
-curriculum in expectation: easy episodes (large vision, no faults, sparse
-obstacles) and hard ones (blind, faulty, cluttered) interleave freely, which
-keeps a steady stream of successful trajectories --- and hence of terminal
-reward signal --- flowing into the replay buffer even before the policy masters
-the hard regimes.
+$\theta = (\rvis, \rcomm, \nagents, \rho, \pfault)$, integers and floats
+uniformly from their ranges, applies it to the environment via
+\texttt{set\_domain\_params}, and only then resets. The ranges are wide by
+design. Vision spans myopic ($\rvis{=}1$: a $3\times3$ window) to far-sighted
+($\rvis{=}6$); communication spans nearly-isolated to easily-connected teams;
+team size spans a single drone, where cooperation is moot and the policy must
+search alone, up to four; obstacle density spans open fields to cluttered mazes;
+and the fault range spans ``faults never happen'' to ``losing roughly half the
+team over an episode is ordinary''. The policy is therefore forced to be
+simultaneously a competent solo searcher, a cooperative team member and a
+survivor of team collapse, with the context vector telling it, at every turn,
+which of these regimes it currently inhabits. Per-episode resampling also acts as
+an implicit curriculum in expectation: easy episodes (large vision, no faults,
+sparse obstacles) and hard ones (blind, faulty, cluttered) interleave freely,
+which keeps a steady stream of successful trajectories, and hence of terminal
+reward signal, flowing into the replay buffer even before the policy masters the
+hard regimes.
 
 \subsection{Schedules}
 \label{subsec:train-schedules}
@@ -60,28 +55,27 @@ $\varepsilon$-greedy exploration is annealed \emph{per episode} and
 multiplicatively: from $\varepsilon_0 = 1$, each episode applies
 $\varepsilon \leftarrow \max(0.05,\, 0.9995\,\varepsilon)$, so the floor of
 $0.05$ is reached at episode $5{,}990$, about $12\%$ of the run
-(Figure~\ref{fig:schedules}a, Appendix~\ref{app:figures}); the residual $5\%$ of random actions thereafter
-keeps the buffer from collapsing onto the greedy policy's own trajectory
-distribution. Exploration coins are drawn per drone per turn
-(Section~\ref{subsec:arch-learning}), so within one round some drones may
-explore while the others act greedily.
+(Figure~\ref{fig:schedules}a, Appendix~\ref{app:figures}); the residual $5\%$ of
+random actions thereafter keeps the buffer from collapsing onto the greedy
+policy's own trajectory distribution. Exploration coins are drawn per drone per
+turn, so within one round some drones may explore while the others act greedily.
 
 \paragraph{Learning rate.}
 The learning rate follows a linear warmup ($10\%$ of the run,
 $10^{-4} \to 5\times10^{-4}$) into a cosine annealing down to $10^{-6}$
 (Figure~\ref{fig:schedules}b). It is stepped \emph{once per episode} rather than
-per gradient step, because episode lengths vary wildly across randomized regimes
---- a lucky find ends an episode in tens of turns, a blind faulty maze consumes
-the full budget --- so stepping per update would tie the schedule's shape to the
-difficulty mix rather than to training progress; and it is sized by the
+per gradient step, because episode lengths vary wildly across randomized regimes:
+a lucky find ends an episode in tens of turns, a blind faulty maze consumes the
+full budget, so stepping per update would tie the schedule's shape to the
+difficulty mix rather than to training progress. And it is sized by the
 \emph{total} episode count across all phases, so the decay is a property of the
 run, not of any single phase.
 
 \paragraph{Update cadence.}
-One Double-DQN gradient step (Section~\ref{subsec:arch-learning}) runs every $4$
-agent-turns on minibatches of $16$ transitions from the shared replay buffer,
-with the target network hard-synchronized every $500$ gradient steps.
-Appendix~\ref{app:config} consolidates all values.
+One Double-DQN gradient step runs every $4$ agent-turns on minibatches of $16$
+transitions from the shared replay buffer, with the target network
+hard-synchronized every $500$ gradient steps. Appendix~\ref{app:config}
+consolidates all values.
 
 \subsection{Learning with an exogenous fault process}
 \label{subsec:train-correctness}
@@ -95,33 +89,31 @@ pending $n$-step window is flushed immediately \emph{with} bootstrapping
 generated for it. The temptation to treat the fault as terminal is strong,
 because it \emph{feels} terminal for that drone; it is not, in the sense that
 matters for learning. The fault strikes independently of the drone's state and
-action ($\pfault$ is exogenous), so the states that happened to precede a fault
+action, $\pfault$ being exogenous, so the states that happened to precede a fault
 are not worth less than identical states that did not. Zeroing the bootstrap
 would charge the value function for bad luck, systematically depressing the
-values of \emph{whatever the drone happened to be doing} when it broke --- noise
+values of \emph{whatever the drone happened to be doing} when it broke: noise
 injected as signal, growing with $\pfault$. Bootstrapping instead treats the
-fault as censoring: the return is simply observed no further. The alternative
---- modelling faults \emph{inside} the value function by scaling values by
-survival probability --- would require the network to know $\pfault$, exactly
-the quantity Section~\ref{subsec:arch-context} argues a deployed drone cannot
-know.
+fault as censoring, the return being simply observed no further. The alternative,
+modelling faults \emph{inside} the value function by scaling values by survival
+probability, would require the network to know $\pfault$, exactly the quantity
+Section~\ref{subsec:arch-context} argues a deployed drone cannot know.
 
 Three further decisions follow the same discipline. Running out of budget is
 likewise a truncation, so the final window still bootstraps
-(Section~\ref{subsec:bg-dqn}; \citealp{pardo2018time}): the world does not end at
-turn $T_{\max}$, and treating it as terminal would bias values along every long
-trajectory. The shared terminal bonus of
-Section~\ref{subsec:prob-objective} is written retroactively into each other
-live drone's most recent still-pending window, which is then marked terminal ---
-a mechanism that requires $n \geq 2$ (with one-step windows nothing is pending
-to credit; the configuration is validated at run start) and that excludes drones
+\citep{pardo2018time}: the world does not end at turn $T_{\max}$, and treating it
+as terminal would bias values along every long trajectory. The shared terminal
+bonus of Table~\ref{tab:reward} is written retroactively into each other live
+drone's most recent still-pending window, which is then marked terminal, a
+mechanism that requires $n \geq 2$ (with one-step windows nothing is pending to
+credit; the configuration is validated at run start) and that excludes drones
 which broke before the find, since their windows were already flushed: a drone
 that died exploring an empty quadrant should not learn that dying there is worth
 the team's eventual success. Finally, checkpoint selection is shielded from the
 shaped reward: every $1{,}000$ episodes the policy is evaluated near-greedily
 ($\varepsilon = 0.05$) on a \emph{fixed} bank of $20$ seeded instances, and a
 new best requires a strictly higher success rate, with mean reward breaking ties
-only at $100\%$ success --- so a policy is never preferred for harvesting
+only at $100\%$ success, so a policy is never preferred for harvesting
 exploration bonuses more efficiently while finding the target less often.
 
 \subsection{Infrastructure and reproducibility}
@@ -131,23 +123,21 @@ Training runs on a SLURM-managed HPC cluster (one GPU per run); the identical
 entry point runs unchanged on a workstation, which is how short debugging
 stagings were iterated. Because the cluster's per-job wall-clock limit is
 shorter than a $50{,}000$-episode run, the final run was executed as a
-\emph{sequence} of jobs, each resuming from \texttt{last.pt} --- which carries
-optimizer, schedule position, $\varepsilon$, gradient-step counter and
-curriculum position --- and therefore continuing \emph{as if uninterrupted}.
-Every run logs per-episode scalars to TensorBoard (reward, length, success, the
-sampled randomization values, drones lost to faults, $\varepsilon$ and the
-learning rate), so a run's difficulty mix and its learning progress can be
-inspected jointly; and, as noted in Section~\ref{subsec:arch-env}, one seed
-reproduces the layout \emph{and} the fault sequence, which is what makes
-checkpoints and configurations comparable on identical instances. Each job
-writes its own event file, so Figures~\ref{fig:training-curves}
+\emph{sequence} of jobs, each resuming from \texttt{last.pt}, which carries
+optimizer, schedule position, $\varepsilon$, gradient-step counter and curriculum
+position, and therefore continuing \emph{as if uninterrupted}. Every run logs
+per-episode scalars to TensorBoard (reward, length, success, the sampled
+randomization values, drones lost to faults, $\varepsilon$ and the learning
+rate), so a run's difficulty mix and its learning progress can be inspected
+jointly; and one seed reproduces the layout \emph{and} the fault sequence, which
+is what makes checkpoints and configurations comparable on identical instances.
+Each job writes its own event file, so Figures~\ref{fig:training-curves}
 and~\ref{fig:training-eval} (the latter in Appendix~\ref{app:figures}) report the
-first tranche --- the $30{,}000$ episodes that fitted inside a single
-allocation. They are the informative ones: every
-logged quantity has flattened by roughly episode $7{,}000$ and none trends over
-the $23{,}000$ episodes that follow, and the checkpoint-level learning curve of
-Figure~\ref{fig:epoch}, reconstructed by re-evaluating the saved weights, covers
-the full $50{,}000$ episodes anyway (Section~\ref{subsec:exp-generalization}).
+first tranche, the $30{,}000$ episodes that fitted inside a single allocation.
+They are the informative ones: every logged quantity has flattened by roughly
+episode $7{,}000$ and none trends over the $23{,}000$ episodes that follow, and
+the checkpoint-level learning curve of Figure~\ref{fig:epoch}, reconstructed by
+re-evaluating the saved weights, covers the full $50{,}000$ episodes anyway.
 
 \begin{figure}[t]
 \centering

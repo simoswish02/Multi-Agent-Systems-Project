@@ -2,12 +2,11 @@
 \label{sec:background}
 
 This section reviews the concepts the rest of the report relies on: the
-value-based reinforcement-learning toolbox (Section~\ref{subsec:bg-dqn}), its
-extension to multiple interacting learners (Section~\ref{subsec:bg-marl}), and
-the technique --- domain randomization with context conditioning --- that lets a
-single policy serve many task variants (Section~\ref{subsec:bg-dr}). Readers
-familiar with deep value-based reinforcement learning may skim through and
-return to individual definitions as they are referenced later.
+value-based reinforcement-learning toolbox, its extension to multiple interacting
+learners, and the technique of domain randomization with context conditioning
+that lets a single policy serve many task variants. Readers familiar with deep
+value-based reinforcement learning may skim through and return to individual
+definitions as they are referenced later.
 
 \subsection{Value-based reinforcement learning}
 \label{subsec:bg-mdp}
@@ -20,10 +19,10 @@ transition kernel $P(s' \mid s, a)$, an expected immediate reward $R(s,a)$ and a
 discount $\gamma \in [0,1)$. At each step the agent observes $s_t$, acts
 according to its \emph{policy} $a_t \sim \pi(\cdot \mid s_t)$, receives $r_t$ and
 moves to $s_{t+1}$; the quantity optimized is the expected \emph{return}
-$G_t = \sum_{k \ge 0} \gamma^k r_{t+k}$. The Markov property --- the distribution
-of $(s_{t+1}, r_t)$ depends on the history only through $(s_t, a_t)$ --- is what
-licenses value functions defined on states rather than on histories. The
-action-value function of an optimal policy $\pi^*$,
+$G_t = \sum_{k \ge 0} \gamma^k r_{t+k}$. The Markov property, namely that the
+distribution of $(s_{t+1}, r_t)$ depends on the history only through
+$(s_t, a_t)$, is what licenses value functions defined on states rather than on
+histories. The action-value function of an optimal policy $\pi^*$,
 $Q^*(s,a) = \mathbb{E}_{\pi^*}[\, G_t \mid s_t = s,\, a_t = a \,]$, satisfies the
 Bellman optimality equation
 $Q^*(s,a) = \mathbb{E}[\, r + \gamma \max_{a'} Q^*(s',a') \mid s,a \,]$, and once
@@ -36,8 +35,8 @@ Q(s,a) \;\leftarrow\; Q(s,a) + \alpha \Bigl[\, r + \gamma \max_{a'} Q(s',a')
 - Q(s,a) \Bigr],
 \]
 and it is \emph{off-policy}: the target uses the greedy action regardless of how
-$a$ was chosen, so the behaviour policy may explore freely --- typically
-\emph{$\varepsilon$-greedy}, acting uniformly at random with probability
+$a$ was chosen, so the behaviour policy may explore freely. The standard choice
+is \emph{$\varepsilon$-greedy}, acting uniformly at random with probability
 $\varepsilon$ and greedily otherwise, with $\varepsilon$ annealed over training.
 
 Tabular methods require one value per state--action pair, hopeless when states
@@ -47,13 +46,13 @@ $Q_\theta(s,a)$ trained by regression on bootstrapped targets, a combination
 unstable in its naive form: consecutive samples are strongly correlated, and the
 target moves with every update of $\theta$, since the same network appears on
 both sides of the Bellman equation. The \emph{Deep Q-Network} (DQN)
-\citep{mnih2015human} stabilizes it with two mechanisms --- \emph{experience
-replay} \citep{lin1992self}, a large circular buffer sampled uniformly at random,
-which breaks temporal correlations and reuses each experience many times, and a
-separate \emph{target network} with frozen parameters $\theta^-$, periodically
-synchronized with $\theta$, which supplies the bootstrap value and keeps the
-regression target fixed between synchronizations --- minimizing a Huber loss on
-the resulting temporal-difference error. Three refinements are used in this work.
+\citep{mnih2015human} stabilizes it with two mechanisms. \emph{Experience replay}
+\citep{lin1992self}, a large circular buffer sampled uniformly at random, breaks
+temporal correlations and reuses each experience many times; a separate
+\emph{target network} with frozen parameters $\theta^-$, periodically
+synchronized with $\theta$, supplies the bootstrap value and keeps the regression
+target fixed between synchronizations. The temporal-difference error is then
+minimized under a Huber loss. Three refinements are used in this work.
 \emph{Double DQN} \citep{vanhasselt2016double} removes the overestimation bias of
 a $\max$ operator that both selects and evaluates the next action with the same
 noisy estimator, by decoupling the two roles,
@@ -66,21 +65,21 @@ action value into a state value and action advantages computed by two heads on a
 shared representation, $Q(s,a) = V(s) + A(s,a) - |\mathcal{A}|^{-1}\sum_{a'}
 A(s,a')$, where the mean subtraction resolves the identifiability of the
 decomposition and lets the network learn the value of a state without having to
-learn the effect of every action in it --- useful when in many states the choice
-of action barely matters and in a few it is critical. And an \emph{$n$-step
-return} accumulates real rewards over a window of $m$ steps before bootstrapping,
+learn the effect of every action in it; this is useful when in many states the
+choice of action barely matters and in a few it is critical. And an
+\emph{$n$-step return} accumulates real rewards over a window of $m$ steps before
+bootstrapping,
 $y = \sum_{k=0}^{m-1} \gamma^k r_{t+k} + \gamma^m\, Q_{\theta^-}(s_{t+m},\cdot)$,
 trading a little extra variance (and, off-policy, a formally uncorrected sampling
-mismatch that works well in practice \citep{hessel2018rainbow}) for much faster
-credit propagation --- a sensible trade when a sparse success signal must travel
-backwards across long trajectories.
+mismatch that works well in practice; \citealp{hessel2018rainbow}) for much
+faster credit propagation, a sensible trade when a sparse success signal must
+travel backwards across long trajectories.
 
 \paragraph{Termination vs.\ truncation.}
-One subtlety becomes central in this project
-(Section~\ref{subsec:train-correctness}). When a window ends in a \emph{terminal}
-state the bootstrap term is dropped ($\gamma^m \to 0$): there is no future to
-estimate. When an episode is merely \emph{truncated} --- by an external time
-limit, say --- the future does exist and the agent simply stops observing it, so
+One subtlety becomes central in this project. When a window ends in a
+\emph{terminal} state the bootstrap term is dropped ($\gamma^m \to 0$): there is
+no future to estimate. When an episode is merely \emph{truncated}, by an external
+time limit say, the future does exist and the agent simply stops observing it, so
 the correct target still bootstraps from the last state \citep{pardo2018time}.
 Conflating the two teaches the network that time-outs are value-zero events,
 systematically biasing value estimates in time-limited tasks.
@@ -97,8 +96,8 @@ depend on the \emph{joint} action. Settings are classified by reward structure:
 \emph{cooperative} (identical or aligned interests), \emph{competitive}
 (zero-sum), and \emph{mixed} (general-sum). This project is cooperative: every
 drone shares the same objective, and none has a private one. When, in addition,
-each agent perceives only part of the state --- receiving a private observation
-$o_i$ correlated with, but not determining, $s$ --- the model becomes a
+each agent perceives only part of the state, receiving a private observation
+$o_i$ correlated with but not determining $s$, the model becomes a
 \emph{decentralized POMDP} (Dec-POMDP) \citep{oliehoek2016concise}. This is the
 setting of this project, and it is provably intractable to solve exactly
 \citep{bernstein2002complexity}: hence the approximate, learning-based methods
@@ -120,7 +119,7 @@ others' actions.
 \paragraph{Centralized training, decentralized execution.}
 Most modern cooperative MARL adopts a middle path, \emph{centralized training
 with decentralized execution} (CTDE) \citep{kraemer2016multi,lowe2017multi}:
-during training --- typically in simulation --- global information may be pooled
+during training, typically in simulation, global information may be pooled
 (shared replay data, joint critics, others' observations), but the artifacts
 deployed are per-agent policies conditioned only on locally available inputs.
 CTDE exploits the asymmetry between what is available in the laboratory and what
@@ -132,8 +131,8 @@ In teams of homogeneous agents, a particularly effective CTDE instance is
 \emph{parameter sharing} \citep{gupta2017cooperative}: all agents are driven by a
 single network, trained on the pooled experience of the whole team. Sharing
 multiplies the effective sample throughput per parameter, and partially
-neutralizes non-stationarity at its source --- teammates cannot drift apart when
-they are, parametrically, the same policy. Its known caveat is symmetry:
+neutralizes non-stationarity at its source, since teammates cannot drift apart
+when they are, parametrically, the same policy. Its known caveat is symmetry:
 identically parameterized agents receiving identical observations produce
 identical behaviour, so useful role differentiation requires an input that
 distinguishes them, typically an agent index appended to the observation.
@@ -152,8 +151,8 @@ Under partial observability the optimal policy generally depends on the
 observation \emph{history}, not the last observation alone; the principled object
 to condition on is a belief state \citep{kaelbling1998planning}. Deep approaches
 either learn a recurrent summary of the history \citep{hausknecht2015deep} or hand
-the agent an explicitly engineered memory maintained outside the network --- e.g.\
-spatial maps accumulating everything observed so far --- turning the observation
+the agent an explicitly engineered memory maintained outside the network, such as
+spatial maps accumulating everything observed so far, turning the observation
 itself into an approximate sufficient statistic of the past. The latter trades
 representational generality for trainability and transparency, and is the choice
 taken in this project (Section~\ref{subsec:prob-obs}).
@@ -162,26 +161,26 @@ taken in this project (Section~\ref{subsec:prob-obs}).
 \label{subsec:bg-dr}
 
 A policy trained in one fixed configuration tends to overfit it. When the
-deployment conditions are uncertain --- or when one wants a \emph{single} policy
-to cover a family of related tasks --- a standard remedy is \emph{domain
-randomization} (DR): sampling the parameters that define the task (in robotics,
-typically visual appearance or physical dynamics) anew at every training episode,
-so that the learner experiences a distribution of environments rather than a
-point \citep{tobin2017domain,peng2018sim}. A policy that performs well across the
+deployment conditions are uncertain, or when one wants a \emph{single} policy to
+cover a family of related tasks, a standard remedy is \emph{domain randomization}
+(DR): sampling the parameters that define the task (in robotics, typically visual
+appearance or physical dynamics) anew at every training episode, so that the
+learner experiences a distribution of environments rather than a point
+\citep{tobin2017domain,peng2018sim}. A policy that performs well across the
 sampled distribution has, by construction, learned strategies robust to the
 randomized factors; with wide enough ranges, the deployment condition becomes
 ``just another sample''.
 
-Randomization can be applied blindly --- the policy never knows which variant it
-is in and must behave robustly on average --- or with \emph{context
+Randomization can be applied blindly, the policy never knowing which variant it
+is in and having to behave robustly on average, or with \emph{context
 conditioning}: the sampled task parameters, or the subset a deployed agent could
 realistically know, are appended to the policy input, turning the problem into a
 \emph{contextual} MDP \citep{hallak2015contextual} and the network into a
 task-conditioned family of policies with shared weights. Conditioning lets the
-same parameters produce different behaviour in different regimes --- e.g.\
-searching more cautiously with a short sensing range than with a long one ---
-rather than a single compromise behaviour. Which parameters to expose and which
-to leave latent is a design decision, and one this report settles concretely in
+same parameters produce different behaviour in different regimes, searching more
+cautiously with a short sensing range than with a long one, rather than settling
+on a single compromise behaviour. Which parameters to expose and which to leave
+latent is a design decision, and one this report settles concretely in
 Section~\ref{subsec:arch-context}: observable, actionable quantities help, while
 quantities the agent could never know in reality would train a dependence that
 breaks at deployment.
