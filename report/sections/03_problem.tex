@@ -152,11 +152,10 @@ choice.
 The episode \emph{terminates} (success) as soon as the acting drone's new
 position equals $g$. It is \emph{truncated} (failure) when $t$ exceeds
 $T_{\max} = 200\cdot\nagents$, or early when all drones are broken, since no
-state change is possible anymore. The distinction between termination and
-truncation is not cosmetic: it changes the bootstrapping semantics of the
-learning update, and Section~\ref{subsec:train-correctness} argues that
-treating faults and time-outs as truncations is necessary for unbiased value
-estimation.
+state change is possible anymore. Faults are likewise truncations of the
+broken drone's experience stream rather than terminal states; the learning
+consequences of this distinction are worked out in
+Section~\ref{subsec:train-correctness}.
 
 \subsection{Observation model}
 \label{subsec:prob-obs}
@@ -276,12 +275,6 @@ to the policy (Section~\ref{subsec:arch-context}) --- is derived from that
 drone's own observations and from what teammates relayed to it. When the
 last drone breaks, the episode is truncated early.
 
-For learning purposes a fault is treated as a \emph{truncation} of the
-broken drone's experience stream, not as a terminal state: the fault strikes
-independently of the drone's state and action, and
-Section~\ref{subsec:train-correctness} shows why conflating the two would
-bias the learned values.
-
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[scale=0.44]
@@ -349,8 +342,8 @@ target reward & $R_{\mathrm{tgt}}$ & $+200$ & the drone's new cell is the target
 \bottomrule
 \end{tabular}
 \caption{Reward terms accumulated within a single turn of the acting drone
-(values from the final configuration). Wrecks receive no reward: their turns
-are no-ops.}
+(values from the final configuration). A wreck's turns still elapse and still
+consume the budget, but change nothing and earn no reward.}
 \label{tab:reward}
 \end{table}
 

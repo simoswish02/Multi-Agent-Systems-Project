@@ -158,18 +158,16 @@ $P(s' \mid s, a_1, \dots, a_N)$ and each agent's reward
 $R_i(s, a_1, \dots, a_N)$ depend on the \emph{joint} action. Settings are
 classified by reward structure: \emph{cooperative} (identical or aligned
 interests), \emph{competitive} (zero-sum), and \emph{mixed}
-(general-sum). Cooperative teams with a common objective --- the setting of
-this project --- can in principle be treated as a single ``puppeteer''
-agent over the joint action space, but that space grows exponentially in
-$N$, and decentralized execution constraints usually forbid it anyway.
+(general-sum). This project is cooperative: every drone shares the same
+objective, and none has a private one.
 
-If, in addition, each agent perceives only part of the state, the model
-becomes a \emph{decentralized POMDP} (Dec-POMDP)
-\citep{oliehoek2016concise}: agents receive private observations
-$o_i$ correlated with, but not determining, the state. Solving Dec-POMDPs
-optimally is NEXP-complete \citep{bernstein2002complexity} --- a complexity
-result that motivates the approximate, learning-based approaches used in
-practice.
+When, in addition, each agent perceives only part of the state --- receiving
+a private observation $o_i$ that is correlated with, but does not determine,
+$s$ --- the model becomes a \emph{decentralized POMDP} (Dec-POMDP)
+\citep{oliehoek2016concise}. This is the setting of this project, and it is
+provably intractable to solve exactly
+\citep{bernstein2002complexity}: hence the approximate, learning-based
+methods used in practice, and in this work.
 
 \paragraph{Non-stationarity.}
 The central pathology of multi-agent learning is that, from any single

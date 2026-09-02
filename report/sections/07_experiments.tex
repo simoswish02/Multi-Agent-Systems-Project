@@ -223,11 +223,19 @@ Re-evaluating the periodic checkpoints at the reference operating point
 $80\text{--}85\%$ by roughly episode $25{,}000$ and holding, with SPL
 continuing to inch up afterward --- the policy keeps refining \emph{how} it
 reaches targets after the \emph{whether} has largely converged. The
-intermediate dip around episodes $17{,}000\text{--}22{,}000$ coincides with
-$\varepsilon$ having reached its floor (Section~\ref{subsec:train-schedules})
-and the learning rate still high on the cosine schedule; it recovers without
-intervention. This curve is the greedy, $300$-seed complement to the online
-training scalars of Section~\ref{subsec:train-infra}.
+intermediate dip around episodes $17{,}500\text{--}22{,}500$ (success
+$68\text{--}70\%$) falls in the stretch where exploration has long since
+floored --- $\varepsilon$ hits $0.05$ at episode $5{,}990$ --- while the
+learning rate is still $67\text{--}82\%$ of its peak on the cosine schedule
+(Figure~\ref{fig:schedules}): large updates against a nearly greedy,
+self-generated state distribution. It recovers without intervention as the
+annealing proceeds; the in-training evaluation logged online
+(Figure~\ref{fig:training-eval}), which uses a different instance bank and was
+recorded independently of these re-evaluations, places its own local minima in
+the same stretch, at episodes $16{,}000$ and $21{,}000$. This curve is the
+greedy, $300$-seed complement to the online training scalars of
+Section~\ref{subsec:train-infra} (Figures~\ref{fig:training-curves}
+and~\ref{fig:training-eval}).
 
 \begin{figure}[t]
 \centering
@@ -247,8 +255,9 @@ $\pfault \in [0, 0.003]$ behave as drones are actually lost mid-mission?
 Figure~\ref{fig:fault} and Table~\ref{tab:fault} sweep the per-turn fault
 probability from the fault-free reference out to $\pfault = 0.01$, more than
 triple the trained maximum --- a regime in which, over $200$ rounds, a drone's
-survival probability is only $0.99^{200} \approx 0.13$ and roughly $1.5$ of
-every $4$ drones are lost per episode on average.
+survival probability is only $0.99^{200} \approx 0.13$ and, at the reference
+team size $\nagents = 3$, roughly $1.5$ drones are lost per episode on
+average.
 
 \begin{table}[t]
 \centering
@@ -283,10 +292,10 @@ fault handling.}
 The central result is that degradation is gentle and monotone. Across the
 \emph{entire} trained range the success rate falls only from $87.6\%$ to
 $82.0\%$ --- under six points --- even though by $\pfault = 0.003$ the team is
-losing, on average, $0.58$ of its four drones per episode. Pushed to the
+losing, on average, $0.58$ of its three drones per episode. Pushed to the
 $3.3\times$ OOD point $\pfault = 0.01$, success degrades to $66.2\%$ with
-$1.51$ drones lost: the policy sheds more than a third of the team and still
-completes two missions in three. There is no cliff. This is the redundancy
+$1.51$ drones lost: the policy sheds, on average, \emph{half} the team and
+still completes two missions in three. There is no cliff. This is the redundancy
 argued in Section~\ref{subsec:mas-resilience} made quantitative --- any
 surviving drone can complete the search, so the loss of some drones removes
 capacity, not the mission --- and it holds under a fault rate the policy was
@@ -313,6 +322,48 @@ rate, while the mean number of drones lost (right) grows as expected. The
 auto-nav skyline runs a near-constant $2\text{--}3$ points above the policy,
 indicating the residual gap is in the final approach, not in fault handling.}
 \label{fig:fault}
+\end{figure}
+
+\paragraph{What the aggregate hides: how many drones actually die.}
+The mean loss counts of Table~\ref{tab:fault} average over very different
+episodes, so Figure~\ref{fig:nbroken} opens them up. Panel~(a) shows the full
+composition: even at the trained maximum $\pfault = 0.003$, a majority of
+episodes ($59\%$) still lose \emph{no} drone, and total wipe-outs are rare
+($3\%$); at the $3.3\times$ OOD point the picture inverts, with only $24\%$
+of episodes fault-free and $27\%$ losing the entire team. Panel~(b)
+conditions success on how many drones survived, and this is where the
+graceful-degradation claim becomes mechanical rather than rhetorical. A team
+that finishes intact succeeds $93.9\%$ of the time; losing one drone costs
+$14$ points ($79.8\%$), and even a lone survivor still finds the target in
+$52.6\%$ of episodes --- roughly the single-drone baseline of
+Section~\ref{subsec:exp-baselines}, reached from a worse starting position.
+The $0\%$ bar at zero survivors is definitional, not a policy failure: an
+all-dead team truncates the episode (Section~\ref{subsec:prob-fault}), so
+those $200$ episodes are lost to the environment rather than to the policy.
+
+The aggregate curve of Figure~\ref{fig:fault} is therefore a mixture of two
+effects --- how often faults strike, and how well the remnant copes --- and
+panel~(b) isolates the second. Because any surviving drone can complete the
+mission, the cost of a fault is the loss of one searcher's worth of
+throughput, not of the mission; the success rate falls in proportion to
+capacity lost rather than collapsing. That is precisely the redundancy
+argued in Section~\ref{subsec:mas-resilience}, and it is what makes the
+top-level curve smooth.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_nbroken.png}
+\caption{Opening up the fault aggregate ($500$ seeds per fault level,
+reference operating point, $\nagents = 3$). \emph{(a)} Composition of
+episodes by number of drones lost: within the trained range most episodes
+still finish with a complete team, while at the OOD point $\pfault = 0.01$
+total wipe-outs become common. \emph{(b)} Success rate conditioned on the
+number of survivors, pooled over all fault levels. Degradation with team
+attrition is gradual --- a single surviving drone still succeeds in over half
+of its episodes --- which is what makes the aggregate curve of
+Figure~\ref{fig:fault} smooth. The zero-survivor bar is $0\%$ by
+construction: an all-dead team truncates the episode.}
+\label{fig:nbroken}
 \end{figure}
 
 \paragraph{Where the small gap lives.}

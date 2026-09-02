@@ -122,8 +122,9 @@ the evaluation protocol relies on
 
 \paragraph{Anatomy of a turn.}
 A live drone's \texttt{step\_agent} call executes a fixed pipeline: (i)~the
-fault coin flip of Section~\ref{subsec:prob-fault} (on a break, the call
-degenerates to a flagged no-op); (ii)~move validation and execution,
+fault coin flip of Section~\ref{subsec:prob-fault} (on a break, the rest of
+the pipeline is skipped and the call returns a flagged no-op, the turn having
+been spent all the same); (ii)~move validation and execution,
 accumulating the reward terms of Table~\ref{tab:reward}; (iii)~vision update
 of the drone's knowledge maps; (iv)~wreck-beacon detection;
 (v)~communication fusion over the connectivity components of

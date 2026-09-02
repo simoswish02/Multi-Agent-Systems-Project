@@ -72,8 +72,8 @@ into the replay buffer even before the policy masters the hard regimes.
 $\varepsilon$-greedy exploration is annealed \emph{per episode} and
 multiplicatively: starting from $\varepsilon_0 = 1$, each episode applies
 $\varepsilon \leftarrow \max(0.05,\, 0.9995\,\varepsilon)$. The floor of
-$0.05$ is reached after roughly $6{,}000$ episodes
-($\approx 12\%$ of the run), after
+$0.05$ is reached at episode $5{,}990$
+($\approx 12\%$ of the run; Figure~\ref{fig:schedules}a), after
 which a residual $5\%$ of random actions keeps the buffer from collapsing
 onto the greedy policy's own trajectory distribution. Exploration coins are
 drawn per drone per turn (Section~\ref{subsec:arch-learning}), so within one
@@ -82,7 +82,7 @@ round some drones may explore while the others act greedily.
 \paragraph{Learning rate.}
 The learning rate follows a linear warmup ($10\%$ of the run,
 $10^{-4} \to 5\times10^{-4}$) into a cosine annealing down to $10^{-6}$ at
-the final episode. Two details are deliberate. The schedule is stepped
+the final episode (Figure~\ref{fig:schedules}b). Two details are deliberate. The schedule is stepped
 \emph{once per episode} rather than per gradient step: episode lengths vary
 wildly across randomized regimes (a lucky find ends an episode in tens of
 turns; a blind, faulty maze consumes the full budget), so stepping per
@@ -95,6 +95,23 @@ One Double-DQN gradient step (Section~\ref{subsec:arch-learning}) runs every
 $4$ agent-turns on minibatches of $16$ transitions from the shared replay
 buffer; the target network is synchronized by hard copy every $500$ gradient
 steps. Appendix~\ref{app:config} consolidates all values.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_schedules.png}
+\caption{The two per-episode schedules of the final $50{,}000$-episode run.
+\emph{(a)} $\varepsilon$-greedy exploration decays multiplicatively and
+reaches its $0.05$ floor at episode $5{,}990$, so about $88\%$ of the run is
+spent at the residual exploration rate. \emph{(b)} The learning rate warms up
+linearly over the first $10\%$ of episodes to $5\times10^{-4}$, then anneals
+cosine-wise to $10^{-6}$. The two are deliberately out of phase: exploration
+has essentially finished annealing while the learning rate is still near its
+peak, so the bulk of the high-learning-rate budget is spent on a
+near-greedy --- and therefore task-relevant --- state distribution. Curves
+are the exact schedules, obtained by driving the implementation's own
+scheduler for the full run length.}
+\label{fig:schedules}
+\end{figure}
 
 \subsection{Reinforcement-learning correctness decisions}
 \label{subsec:train-correctness}
@@ -206,5 +223,62 @@ evaluation from the training loop (which would otherwise stall for minutes
 every $1{,}000$ episodes) and, in practice, provides a second opinion on
 checkpoint selection at no wall-clock cost to training.
 
-% Figure TODO (after the final run): training curves — episode reward,
-% eval success rate, epsilon/LR schedules, n_broken histogram.
+\paragraph{Telemetry across jobs.}
+The cluster enforces a wall-clock limit of $2$ days and $23$ hours per job,
+which is shorter than a $50{,}000$-episode run at this configuration. The
+final run was therefore executed as a \emph{sequence} of jobs, each resuming
+from \texttt{last.pt} and continuing the curriculum, schedules and optimizer
+state as if uninterrupted --- exactly the scenario the resumption machinery
+above was built for. Each job opens its own TensorBoard event file, and only
+the first was recovered: it covers episodes $1$ to $30{,}169$, the
+$2$d\,$22$h\,$53$m of training that fitted inside a single allocation. The
+later files were lost to the cluster's $40$-day purge of unmodified scratch
+files. Figures~\ref{fig:training-curves} and~\ref{fig:training-eval}
+therefore show the first $60\%$ of the run. Little is lost with the rest:
+every logged quantity has flattened by roughly episode $7{,}000$ and none of
+them trends over the $23{,}000$ logged episodes that follow, and the
+checkpoint-level learning curve of Figure~\ref{fig:epoch} --- reconstructed
+by re-evaluating the saved weights, and so independent of the event files ---
+covers the full $50{,}000$ episodes.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_training_curves.png}
+\caption{Per-episode training telemetry over the first $30{,}169$ episodes of
+the final run. Solid curves are $500$-episode moving averages, shaded bands
+the corresponding interquartile ranges, and the dashed vertical line marks
+the episode at which $\varepsilon$ reaches its floor
+(Figure~\ref{fig:schedules}a). \emph{(a)} Mean return crosses zero at around
+episode $2{,}500$ and settles near $+25$. \emph{(b)} The fraction of episodes
+in which the target is found climbs from $16\%$ to a plateau of
+$65\text{--}68\%$, with the fixed-instance greedy evaluation (red) tracking
+the exploratory training curve closely. \emph{(c)} Mean episode length falls
+from $440$ to roughly $250$ rounds, so the policy converges on \emph{whether}
+it finds the target and on \emph{how fast} together. The bands stay wide
+throughout because every episode draws a fresh randomization $\theta$: their
+width measures the difficulty mix of Section~\ref{subsec:train-dr} rather
+than instability, since a myopic solo drone in a cluttered map and a
+far-sighted team of four both fall inside every window.}
+\label{fig:training-curves}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{fig_training_eval.png}
+\caption{In-training greedy evaluation of the same run, executed every
+$1{,}000$ episodes on the fixed bank of $20$ seeded instances that drives
+checkpoint selection. \emph{(a)} Success rate and \emph{(b)} mean return,
+with the best value of each circled. These levels are deliberately not
+comparable with those of Section~\ref{sec:experiments}: the bank is drawn
+from the \emph{full} randomization ranges --- solo drones, $\rvis{=}1$,
+faults active --- whereas Section~\ref{sec:experiments} measures at the
+reference operating point, which sits at the centre of those ranges. The
+$5$-point sawtooth in \emph{(a)} is the quantization of a $20$-instance bank,
+one episode being worth five points; it is precisely the noise that the
+strict-improvement selection rule of
+Section~\ref{subsec:train-correctness} is designed not to chase. Both panels
+flatten by around episode $7{,}000$, and their local minima at episodes
+$16{,}000$ and $21{,}000$ fall in the same stretch of the run as the dip seen
+in Figure~\ref{fig:epoch}.}
+\label{fig:training-eval}
+\end{figure}

@@ -61,9 +61,9 @@ teammates remain operational. The result is a single generalist policy
 that searches alone or in a team, myopic or far-sighted, in empty fields or
 cluttered mazes --- and that experiences teammate death, and the need to
 absorb it, as an ordinary feature of its world. The fault model demands
-equal care on the learning side: a fault is exogenous bad luck, not a
-consequence of behaviour, and Section~\ref{sec:training} shows why treating
-it as anything but a truncation would silently bias the learned values.
+equal care on the learning side --- a fault is exogenous bad luck, not a
+consequence of behaviour --- and Section~\ref{sec:training} details how the
+learning updates are made to respect that.
 
 \paragraph{Why this is a multi-agent systems study.}
 A reinforcement-learning pipeline, however carefully engineered, is not by
@@ -112,11 +112,18 @@ The report makes the following contributions:
     mechanisms and the paradigm's core concepts --- agenthood, environment,
     coordination, artefacts, self-organisation, openness, autonomy, and
     multi-agent learning.
-  \item \emph{An experimental protocol --- and, pending the conclusion of
-    training, its results} (Section~\ref{sec:experiments}): seeded,
-    reproducible evaluation of fault robustness, generalization across
-    randomization axes, and the quantitative signatures of emergent
-    coordination.
+  \item \emph{An empirical demonstration of generalization and graceful
+    degradation} (Section~\ref{sec:experiments}): a seeded,
+    one-factor-at-a-time protocol ($500$ episodes per configuration) showing
+    that the single policy holds essentially flat across team size, vision
+    and communication range --- including \emph{beyond} the ranges it was
+    trained on --- while obstacle density is the one axis that genuinely
+    governs difficulty; and, as the headline result, that success falls by
+    under six points across the entire trained fault range and still reaches
+    $66\%$ at more than triple the trained fault rate --- where half the team
+    is lost on average --- with no cliff. The
+    same sweeps expose the coverage and redundancy signatures of the
+    emergent division of labour.
   \item \emph{A prospective ethical and regulatory analysis}
     (Section~\ref{sec:ethics}): the capability's dual-use profile, its
     treatment under the GDPR and the EU AI Act (including the military
