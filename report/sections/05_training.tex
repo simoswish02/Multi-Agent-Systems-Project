@@ -229,36 +229,29 @@ which is shorter than a $50{,}000$-episode run at this configuration. The
 final run was therefore executed as a \emph{sequence} of jobs, each resuming
 from \texttt{last.pt} and continuing the curriculum, schedules and optimizer
 state as if uninterrupted --- exactly the scenario the resumption machinery
-above was built for. Each job opens its own TensorBoard event file, and only
-the first was recovered: it covers episodes $1$ to $30{,}169$, the
-$2$d\,$22$h\,$53$m of training that fitted inside a single allocation. The
-later files were lost to the cluster's $40$-day purge of unmodified scratch
-files. Figures~\ref{fig:training-curves} and~\ref{fig:training-eval}
-therefore show the first $60\%$ of the run. Little is lost with the rest:
-every logged quantity has flattened by roughly episode $7{,}000$ and none of
-them trends over the $23{,}000$ logged episodes that follow, and the
-checkpoint-level learning curve of Figure~\ref{fig:epoch} --- reconstructed
-by re-evaluating the saved weights, and so independent of the event files ---
+above was built for. Each job logs to its own TensorBoard event file, and
+Figures~\ref{fig:training-curves} and~\ref{fig:training-eval} report the
+first tranche: the $30{,}000$ episodes that fitted inside a single
+allocation. They are the informative ones, since every logged quantity has
+flattened by roughly episode $7{,}000$ and none of them trends over the
+$23{,}000$ episodes that follow; the checkpoint-level learning curve of
+Figure~\ref{fig:epoch}, reconstructed by re-evaluating the saved weights,
 covers the full $50{,}000$ episodes.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_training_curves.png}
-\caption{Per-episode training telemetry over the first $30{,}169$ episodes of
+\caption{Per-episode training telemetry over the first $30{,}000$ episodes of
 the final run. Solid curves are $500$-episode moving averages, shaded bands
-the corresponding interquartile ranges, and the dashed vertical line marks
-the episode at which $\varepsilon$ reaches its floor
-(Figure~\ref{fig:schedules}a). \emph{(a)} Mean return crosses zero at around
-episode $2{,}500$ and settles near $+25$. \emph{(b)} The fraction of episodes
-in which the target is found climbs from $16\%$ to a plateau of
-$65\text{--}68\%$, with the fixed-instance greedy evaluation (red) tracking
-the exploratory training curve closely. \emph{(c)} Mean episode length falls
-from $440$ to roughly $250$ rounds, so the policy converges on \emph{whether}
-it finds the target and on \emph{how fast} together. The bands stay wide
-throughout because every episode draws a fresh randomization $\theta$: their
-width measures the difficulty mix of Section~\ref{subsec:train-dr} rather
-than instability, since a myopic solo drone in a cluttered map and a
-far-sighted team of four both fall inside every window.}
+the corresponding interquartile ranges; the dashed line marks the episode at
+which $\varepsilon$ reaches its floor (Figure~\ref{fig:schedules}a).
+\emph{(a)} Mean return crosses zero at around episode $2{,}500$ and settles
+near $+25$; \emph{(b)} the target is found in $65\text{--}68\%$ of episodes
+at the plateau, with the greedy evaluation (red) tracking the exploratory
+training curve; \emph{(c)} mean episode length falls from $440$ to roughly
+$250$ rounds. The bands stay wide because every episode draws a fresh
+randomization $\theta$: their width measures the difficulty mix of
+Section~\ref{subsec:train-dr}, not instability.}
 \label{fig:training-curves}
 \end{figure}
 
@@ -267,18 +260,14 @@ far-sighted team of four both fall inside every window.}
 \includegraphics[width=0.9\textwidth]{fig_training_eval.png}
 \caption{In-training greedy evaluation of the same run, executed every
 $1{,}000$ episodes on the fixed bank of $20$ seeded instances that drives
-checkpoint selection. \emph{(a)} Success rate and \emph{(b)} mean return,
-with the best value of each circled. These levels are deliberately not
-comparable with those of Section~\ref{sec:experiments}: the bank is drawn
-from the \emph{full} randomization ranges --- solo drones, $\rvis{=}1$,
-faults active --- whereas Section~\ref{sec:experiments} measures at the
-reference operating point, which sits at the centre of those ranges. The
+checkpoint selection; \emph{(a)} success rate and \emph{(b)} mean return,
+best values circled. These levels are not comparable with those of
+Section~\ref{sec:experiments}: this bank samples the \emph{full}
+randomization ranges --- solo drones, $\rvis{=}1$, faults active --- whereas
+Section~\ref{sec:experiments} measures at the reference operating point. The
 $5$-point sawtooth in \emph{(a)} is the quantization of a $20$-instance bank,
-one episode being worth five points; it is precisely the noise that the
-strict-improvement selection rule of
+which is the noise the strict-improvement selection rule of
 Section~\ref{subsec:train-correctness} is designed not to chase. Both panels
-flatten by around episode $7{,}000$, and their local minima at episodes
-$16{,}000$ and $21{,}000$ fall in the same stretch of the run as the dip seen
-in Figure~\ref{fig:epoch}.}
+flatten by around episode $7{,}000$.}
 \label{fig:training-eval}
 \end{figure}
