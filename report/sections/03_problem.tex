@@ -388,8 +388,9 @@ discount $\gamma$. Each term implements one facet of the task:
 At evaluation time (Section~\ref{sec:experiments}) the reward is set aside
 and performance is reported through task-level metrics: \emph{success rate}
 (fraction of episodes in which the target is reached within $T_{\max}$),
-\emph{time-to-find} (turns elapsed at termination, over successful
-episodes), \emph{coverage} (fraction of free cells discovered by the team),
+\emph{time-to-find} (rounds elapsed at termination, i.e.\ agent-turns divided
+by $\nagents$, over successful episodes), \emph{coverage} (fraction of free
+cells discovered by the team),
 and \emph{redundancy} (overlap between the regions swept by different
 drones). The last two also serve as quantitative signatures of the emergent
 division of labour analysed in Section~\ref{subsec:mas-emergence}.

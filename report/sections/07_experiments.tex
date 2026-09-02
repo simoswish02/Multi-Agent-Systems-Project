@@ -48,10 +48,14 @@ We report the task-level metrics defined in
 Section~\ref{subsec:prob-objective}, plus a standard path-quality measure.
 \emph{Success rate} is the fraction of episodes reaching the target within
 $T\cdot\nagents$ agent-turns, with a Wilson $95\%$ confidence interval for
-the binomial proportion. \emph{Time-to-find} is the number of agent-turns at
-success, averaged over successful episodes only --- note this counts
-\emph{every} drone's turn, so at fixed difficulty it grows mechanically with
-team size (more turns per round), a point we return to below. \emph{Coverage}
+the binomial proportion. \emph{Time-to-find} is the number of \emph{rounds}
+elapsed at success, averaged over successful episodes only. The simulator
+advances in agent-turns and every drone consumes one turn per round ---
+wrecks included, since a broken drone's no-op still costs its turn
+(Section~\ref{subsec:prob-fault}) --- so the raw count is divided by
+$\nagents$. This reports elapsed mission time rather than accumulated drone
+effort, and puts the metric in the same unit as the step budget $T$, against
+which it would otherwise be incomparable. \emph{Coverage}
 is the fraction of free cells the team has discovered at episode end;
 \emph{overlap} is the fraction of team-visited cells visited by more than one
 drone, and \emph{revisits} the mean per-drone re-entries --- the two
@@ -153,14 +157,31 @@ argued in Section~\ref{subsec:mas-learning}. SPL climbs alongside success
 more searchers means the target is typically found by whichever drone is
 already nearest, shortening the winning path.
 
+Larger teams are also genuinely \emph{faster}, and not merely more likely to
+succeed. Mission time falls from $84.9$ rounds for a lone searcher to $55.5$
+at $\nagents = 3$ and $50.4$ at $\nagents = 4$, continuing to $42.7$ at
+$\nagents = 6$. The speed-up is real but markedly sublinear: $1.53\times$ at
+$\nagents = 3$ and $1.99\times$ at $\nagents = 6$, a parallel efficiency
+falling from $51\%$ to $33\%$. Doubling the team from three drones to six
+therefore cuts mission time by a further $23\%$ rather than halving it again
+--- the quantitative form of the coordination overhead the next paragraph
+makes concrete.
+
 Two costs temper the picture, both visible in Figure~\ref{fig:sweep-nagents}.
 Mean return \emph{falls} as the team grows (more drones each paying the step
 penalty), which is why return is not our ranking metric. And same-cell
 collisions rise steeply with $\nagents$ --- an unavoidable consequence of a
 shared spawn corner and a bounded map, where more bodies contend for the same
-early cells. Time-to-find also rises with $\nagents$, but this is the
-counting artefact noted above (it sums every drone's turns); it does
-\emph{not} mean larger teams are slower in wall-clock rounds.
+early cells. Congestion is precisely the mechanism behind the diminishing
+returns reported above: an added searcher spends an increasing share of the
+episode contending for, and re-sweeping, ground the team already holds. The
+two redundancy statistics separate the individual from the collective view of
+this --- per-drone revisits fall ($13.9 \to 8.8$ from $\nagents = 1$ to $6$,
+each drone individually more efficient) while team overlap rises
+($18.5\% \to 37.0\%$ from $\nagents = 2$ to $6$, the team collectively more
+wasteful). Coverage confirms the ceiling: it plateaus at
+$53.7\text{--}55.2\%$ from $\nagents = 3$ on, so beyond that point extra drones
+mostly duplicate each other's ground rather than extend the swept region.
 
 \begin{figure}[t]
 \centering
@@ -169,9 +190,14 @@ counting artefact noted above (it sums every drone's turns); it does
 in-distribution ($1\!\le\!\nagents\!\le\!4$), red squares the OOD
 extrapolation, shaded bands the Wilson $95\%$ CI (success) or $\pm1$ standard
 deviation (return). Success and SPL improve monotonically and extend cleanly
-beyond the trained maximum; the cost is congestion (collisions) at the shared
-spawn corner, while per-drone revisits fall --- the division-of-labour
-signature of Section~\ref{subsec:exp-qualitative}.}
+beyond the trained maximum, and mission time falls from $84.9$ to $42.7$
+rounds --- a real but sublinear speed-up. The cost is congestion (collisions)
+at the shared spawn corner, while per-drone revisits fall --- the
+division-of-labour signature of Section~\ref{subsec:exp-qualitative}. Note
+that the bounded panels are drawn on axes fitted to the data rather than the
+full $0\text{--}100\%$ range, so that trends of a few points remain legible;
+map coverage is the exception and keeps its full range, its variation along
+the flatter axes being comparable to the sampling noise at $500$ seeds.}
 \label{fig:sweep-nagents}
 \end{figure}
 
@@ -185,10 +211,14 @@ point the bottleneck is deciding \emph{where} to go, not seeing farther.
 Communication is the more interesting axis: success is essentially
 \emph{flat} across the entire range, $87\text{--}89\%$, and --- strikingly ---
 severing communication entirely ($\rcomm = 0$, an OOD probe) costs almost
-nothing in success ($87.6\%$). Communication does buy a modest improvement in
-\emph{path quality} (SPL $0.49 \to 0.59$ from $\rcomm = 0$ to $16$) and in
-redundancy, as shared maps let drones avoid re-covering each other's ground,
-but it is not what determines whether the target is found. We take this
+nothing in success ($87.6\%$). What communication does buy is
+\emph{efficiency}. Path quality improves steadily (SPL $0.49 \to 0.59$ from
+$\rcomm = 0$ to $16$), redundancy falls as shared maps let drones avoid
+re-covering each other's ground, and --- the effect the per-round metric
+brings out --- the team is markedly \emph{quicker}: mission time drops from
+$61.7$ rounds with communication severed to $49.6$ at $\rcomm = 10$, a $20\%$
+saving, before flattening. Communication thus governs how efficiently the
+team searches, not whether it succeeds. We take this
 finding up directly as an ablation in Section~\ref{subsec:exp-ablations}, as
 it bears on the coordination analysis of Section~\ref{subsec:mas-coordination}.
 
@@ -213,7 +243,12 @@ generous budget only helps episodes that were close to succeeding anyway.
 governs difficulty and the one whose OOD extrapolation (shaded, $\rho > 0.30$)
 degrades sharply. The redundancy panel makes the mechanism concrete: clutter
 funnels the team together, so collisions and per-drone revisits climb as
-success and path quality fall.}
+success and path quality fall. Time-to-find is the one panel not to read as a
+difficulty signal: it is averaged over successful episodes only, so its drop
+at the OOD densities ($66.4$ rounds at $\rho = 0.30$ against $21.1$ at
+$\rho = 0.40$) is survivorship --- at $24.2\%$ success, the few episodes that
+still finish are those whose target happened to lie near the spawn corner,
+not evidence of a faster team.}
 \label{fig:sweep-density}
 \end{figure}
 
