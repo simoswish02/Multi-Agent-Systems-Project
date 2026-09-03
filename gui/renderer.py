@@ -111,6 +111,11 @@ class DroneRenderer:
         self._heading = []
         self._teleport = False         # set on episode boundaries: snap, no glide
 
+        # Optional virtual animation clock in ms. When set it overrides both
+        # the wall clock and the step-derived headless clock, so an offscreen
+        # recorder can emit several video frames per env round.
+        self._vclock_ms = None
+
         # Collapsible sidebar sections (all expanded by default)
         self.sections = {"minimaps": True, "charts": True, "log": True}
 
@@ -180,8 +185,12 @@ class DroneRenderer:
         return self.SPEED_STEPS[self.speed_idx]
 
     def _now(self) -> int:
-        """Animation clock in milliseconds. Headless frames derive it from
-        step_count so rgb_array output stays deterministic."""
+        """Animation clock in milliseconds. An explicit virtual clock wins when
+        set (offscreen recording drives it per video frame); otherwise headless
+        frames derive it from step_count so rgb_array output stays
+        deterministic."""
+        if self._vclock_ms is not None:
+            return int(self._vclock_ms)
         if self.headless:
             return int(getattr(self.env, "step_count", 0)) * 100
         return pygame.time.get_ticks()
@@ -262,12 +271,29 @@ class DroneRenderer:
                 break
         self._display_pos = targets
 
-    def get_rgb_array(self):
-        """Render to the offscreen surface and return an (H, W, 3) array."""
+    def draw_offscreen(self, now_ms=None, display_pos=None):
+        """Draw one frame and return the surface it was drawn on.
+
+        Both arguments are optional and default to the historical behaviour
+        (true positions, step-derived clock). A recorder emitting several video
+        frames per env round passes ``now_ms`` to advance the animation clock
+        and ``display_pos`` (float grid coords) to glide the drones between
+        cells. ``_tick_data`` runs first because an episode boundary resets the
+        drawn positions.
+
+        The surface is reused every call -- blit or copy it before drawing
+        again.
+        """
+        self._vclock_ms = now_ms
         self._tick_data()
-        self._display_pos = None         # headless: always draw true positions
+        self._display_pos = display_pos   # None: draw true positions
         self._draw()
-        return np.transpose(np.array(pygame.surfarray.array3d(self.screen)), axes=(1, 0, 2))
+        return self.screen
+
+    def get_rgb_array(self, now_ms=None, display_pos=None):
+        """Render to the offscreen surface and return an (H, W, 3) array."""
+        surf = self.draw_offscreen(now_ms, display_pos)
+        return np.transpose(np.array(pygame.surfarray.array3d(surf)), axes=(1, 0, 2))
 
     def close(self):
         self._closed = True

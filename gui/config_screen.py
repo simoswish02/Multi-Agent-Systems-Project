@@ -194,7 +194,7 @@ class ConfigScreen:
     normalisation the network was trained with.
     """
 
-    W, H = 560, 660
+    W, H = 560, 716
 
     def __init__(self, config: dict):
         self.config = config
@@ -202,7 +202,11 @@ class ConfigScreen:
         self.v_max = int(dr.get("vision_radius", [1, 6])[1])
         self.c_max = int(dr.get("comm_range", [1, 12])[1])
         self.a_max = int(dr.get("n_agents", [1, 4])[1])
+        self.d_lo, self.d_hi = [float(v) for v in
+                                dr.get("obstacle_density", [0.10, 0.30])]
         self.default_max_steps = int(config.get("env", {}).get("max_steps", 200))
+        self.default_density   = float(config.get("env", {})
+                                       .get("obstacle_density", 0.20))
         self.default_fault     = float(config.get("env", {}).get("fault_prob", 0.0))
         self.ckpt_dir = config.get("training", {}).get("checkpoint_dir", "checkpoints/")
         self.default_weights = os.path.join(self.ckpt_dir, "best.pt")
@@ -224,11 +228,14 @@ class ConfigScreen:
         s_agents = Slider(x, y, w, "Number of drones", 1, self.a_max, min(2, self.a_max)); y += gap
         s_vision = Slider(x, y, w, "Vision radius", 1, self.v_max, min(3, self.v_max)); y += gap
         s_comm   = Slider(x, y, w, "Communication radius", 1, self.c_max, min(5, self.c_max)); y += gap
+        s_dens   = FloatSlider(x, y, w, "Obstacle density", self.d_lo, self.d_hi,
+                               self.default_density, step=0.01,
+                               fmt="{:.2f}"); y += gap
         s_steps  = Slider(x, y, w, "Max steps", 50, 600, self.default_max_steps); y += gap
         s_eps    = Slider(x, y, w, "Episodes to simulate", 1, 50, 10); y += gap
         s_fault  = FloatSlider(x, y, w, "Fault probability / step", 0.0, 0.01,
                                self.default_fault, step=0.0005); y += gap
-        sliders = [s_agents, s_vision, s_comm, s_steps, s_eps, s_fault]
+        sliders = [s_agents, s_vision, s_comm, s_dens, s_steps, s_eps, s_fault]
 
         t_nav = Toggle(x, y, "Auto-nav: BFS to target once known (eval-only)")
         y += 36
@@ -266,6 +273,7 @@ class ConfigScreen:
                                 "n_agents":      s_agents.value,
                                 "vision_radius": s_vision.value,
                                 "comm_range":    s_comm.value,
+                                "obstacle_density": s_dens.fvalue,
                                 "max_steps":     s_steps.value,
                                 "episodes":      s_eps.value,
                                 "fault_prob":    s_fault.fvalue,

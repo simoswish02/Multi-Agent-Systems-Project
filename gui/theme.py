@@ -129,8 +129,23 @@ def with_alpha(c, a: int):
     return (c[0], c[1], c[2], a)
 
 
+_mouse_override = None
+
+
+def set_mouse_override(pos):
+    """Force what `mouse_pos` reports, or clear it with None.
+
+    Offscreen rendering has no real pointer, so a recorder drawing a synthetic
+    cursor sets this to get the same hover states a user would see.
+    """
+    global _mouse_override
+    _mouse_override = None if pos is None else (int(pos[0]), int(pos[1]))
+
+
 def mouse_pos():
     """Mouse position, or offscreen when no display window exists (headless)."""
+    if _mouse_override is not None:
+        return _mouse_override
     if pygame.display.get_surface() is None:
         return (-1, -1)
     return pygame.mouse.get_pos()

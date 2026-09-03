@@ -307,6 +307,7 @@ def run_simulate(config: dict, args):
         print(
             f"Simulate: agents={sel['n_agents']}  vision={sel['vision_radius']}  "
             f"comm={sel['comm_range']}  max_steps={sel['max_steps']}  "
+            f"density={sel['obstacle_density']:.2f}  "
             f"episodes={sel['episodes']}  fault_prob={fault_prob}  "
             f"auto_nav={auto_nav}  weights={sel['weights']}"
         )
@@ -325,7 +326,9 @@ def run_simulate(config: dict, args):
         env = None
         try:
             env = DroneSearchEnv(cfg, render_mode="human")
-            env.set_domain_params(**ctx_params, fault_prob=fault_prob)
+            env.set_domain_params(**ctx_params,
+                                  obstacle_density=sel["obstacle_density"],
+                                  fault_prob=fault_prob)
             agent = build_agent(config, device=device)
             agent.load(sel["weights"])
             agent.epsilon = 0.0
