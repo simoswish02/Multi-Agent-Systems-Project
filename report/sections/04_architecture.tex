@@ -373,8 +373,27 @@ workflows: an \emph{eval} mode that renders greedy policy episodes; a
 sanity-checking reward mechanics and fault behaviour from the inside; and a
 \emph{simulate} mode with a configuration screen (team size, vision,
 communication, density, and a fault-probability slider) that runs batches of
-episodes with live rendering of maps, beliefs and per-drone status. The renderer
-is strictly read-only with respect to the environment (Figure~\ref{fig:modules}).
+episodes with live rendering of maps, beliefs and per-drone status
+(Figure~\ref{fig:gui}). The renderer is strictly read-only with respect to the
+environment (Figure~\ref{fig:modules}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_gui.png}
+\caption{The \emph{simulate} mode mid-episode, with the trained policy driving
+four drones under an active fault process (round $48$, three drones alive). On
+the board, light cells are the team's discovered region and dark ones the
+unknown remainder; the dashed link at the top left is an active fusion event
+between two drones inside $\rcomm$, and the red concentric rings at the bottom
+right are the distress beacon of the wreck, which the drone beside it has just
+entered range of. The sidebar is the instrumentation the analysis relies on: the
+four mini-maps show each drone's \emph{private} accumulated knowledge, visibly
+different from one another and from the team union, with the wreck's frozen map
+flagged \texttt{BROKEN}; the charts track per-drone reward, coverage, newly
+discovered cells and communication events; and the log records every turn,
+including the fusion events by which crash knowledge spreads.}
+\label{fig:gui}
+\end{figure}
 
 For quantitative work, \texttt{eval\_checkpoints.py} ranks checkpoints on
 identical fixed-seed instance sets, the same seeds reproducing the same layouts
