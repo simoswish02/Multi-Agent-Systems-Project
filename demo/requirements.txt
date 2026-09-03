@@ -1,0 +1,3 @@
+imageio-ffmpeg>=0.5   # bundles a private ffmpeg binary; no system install needed
+edge-tts>=6.1         # narration; sends the script text to a Microsoft endpoint
+# pyttsx3             # optional offline fallback: python -m demo.build --tts sapi

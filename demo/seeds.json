@@ -1,0 +1,20 @@
+{
+  "hero": {
+    "seed": 3,
+    "breaks": [
+      [
+        2,
+        56
+      ],
+      [
+        1,
+        75
+      ]
+    ],
+    "n_broken": 2,
+    "find_round": null,
+    "rounds": 115,
+    "running": true,
+    "coverage": 0.9163591635916359
+  }
+}

@@ -248,3 +248,6 @@ report/*.fls
 report/*.fdb_latexmk
 report/*.synctex.gz
 report/sections/*.aux
+
+# Demo film build products (see demo/README.md)
+demo/out/
