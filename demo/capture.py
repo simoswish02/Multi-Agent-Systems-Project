@@ -6,7 +6,7 @@ invariant -- so what the film shows is what the system does. The only addition
 is that the GUI is rendered several times per round, gliding the drones between
 cells, instead of once per round.
 
-Invariant kept from docs/ARCHITECTURE.md: BFS auto-nav is eval/simulate-only, and it stays
+Invariant kept from the report (Section 4.7): BFS auto-nav is eval/simulate-only, and it stays
 off unless a scene explicitly asks for it.
 """
 

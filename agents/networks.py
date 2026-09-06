@@ -22,7 +22,7 @@ All normalisation is batch-size-independent (LayerNorm / GRN), identical in
 train and eval — consistent with the project's earlier GroupNorm rationale.
 
 Channel-layout constants are duplicated (intentionally, with no shared import) in
-``env/grid_env.py`` — see docs/ARCHITECTURE.md "Invariant 3". Keep the two copies in sync.
+``env/grid_env.py`` (report Section 4.3, Table 3). Keep the two copies in sync.
 """
 
 import torch

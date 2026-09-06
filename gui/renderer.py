@@ -16,7 +16,7 @@ advances every drone. The playback controls work by gating that loop from
 inside `render()`: while PAUSED the call blocks (keeping the window responsive)
 until the user presses Play or requests a single Step. One Step therefore
 advances exactly one call's worth of environment stepping (one round in the
-eval loop). See docs/REFACTOR_REPORT.md ("GUI — What changed").
+eval loop).
 
 All UI strings are in English. Comments are in English.
 """
