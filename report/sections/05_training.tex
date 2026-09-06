@@ -1,32 +1,24 @@
 \section{Training Methodology}
 \label{sec:training}
 
-This section describes how the shared policy is trained: the curriculum and
-domain-randomization protocol, the exploration and learning-rate schedules, the
-learning-side decisions that the fault model makes unusually delicate, and the
-infrastructure that makes a long run reproducible and resumable.
+This section describes how the shared policy is trained: the domain-randomization
+protocol, the exploration and learning-rate schedules, the learning-side
+decisions that the fault model makes unusually delicate, and the infrastructure
+that makes a long run reproducible and resumable.
 
-\subsection{Curriculum and domain randomization}
+\subsection{Domain randomization}
 \label{subsec:train-curriculum}
 \label{subsec:train-dr}
 
-Training is organized as an ordered list of \emph{phases}, declared entirely in
-the configuration file. A phase specifies its episode count and may override the
-team size, obstacle density, per-drone step budget, an exploration reset, and
-its own randomization ranges; anything not overridden falls back to the global
-settings. Two conventions turn the list into a staging tool. A phase with zero
-episodes is skipped, so alternative stagings are kept in the file and enabled by
-editing a single number, and the exact shape of every run is versioned alongside
-the code. And phase boundaries interact cleanly with resuming: a restarted run
-skips completed phases, resumes the active one at its saved episode index, and
-suppresses that phase's exploration reset, keeping the checkpoint's annealed
-$\varepsilon$ rather than re-inflating it. The run reported here is a single
-phase of $50{,}000$ episodes with a per-drone budget of $200$ rounds and the
-full ranges of Table~\ref{tab:notation} active throughout, faults included;
-earlier exploratory stagings informed the hyperparameters but contribute no
-weights, since the reported policy is trained from scratch in that one phase.
-The curriculum machinery is nevertheless part of the contribution: it is what
-made those iterations cheap.
+The training loop supports staging a run as an ordered list of \emph{phases},
+each with its own episode count and optional overrides; a phase with zero
+episodes is skipped, which makes alternative stagings cheap to keep in the
+configuration file and to enable one number at a time. The reported policy makes
+no use of that machinery. It is trained from scratch in a \emph{single} phase of
+$50{,}000$ episodes, with the per-drone budget set to $200$ rounds and the full
+ranges of Table~\ref{tab:notation} active throughout, faults included
+(Table~\ref{tab:app-curriculum}). Earlier exploratory stagings informed the
+hyperparameters but contribute no weights.
 
 At the start of every episode the loop samples
 $\theta = (\rvis, \rcomm, \nagents, \rho, \pfault)$, integers and floats
@@ -80,41 +72,29 @@ consolidates all values.
 \subsection{Learning with an exogenous fault process}
 \label{subsec:train-correctness}
 
-The fault model interacts with value-based learning in a way that is easy to get
-silently wrong: nothing crashes, training even improves, but the learned values
-answer a subtly different question than intended. The decision that matters is
-that \textbf{a fault is a truncation, not a terminal}. When a drone breaks, its
-pending $n$-step window is flushed immediately \emph{with} bootstrapping
-($\gamma^k$ for the $k$ steps accumulated) and no further transitions are
-generated for it. The temptation to treat the fault as terminal is strong,
-because it \emph{feels} terminal for that drone; it is not, in the sense that
-matters for learning. The fault strikes independently of the drone's state and
-action, $\pfault$ being exogenous, so the states that happened to precede a fault
+Applying the termination/truncation distinction of
+Section~\ref{subsec:bg-dqn} to an exogenous fault process gives the decision
+that matters here: \textbf{a fault is a truncation, not a terminal}. When a drone
+breaks, its pending $n$-step window is flushed immediately \emph{with}
+bootstrapping and no further transitions are generated for it. A fault
+\emph{feels} terminal for that drone, but $\pfault$ is exogenous: it strikes
+independently of state and action, so the states that happened to precede a fault
 are not worth less than identical states that did not. Zeroing the bootstrap
-would charge the value function for bad luck, systematically depressing the
-values of \emph{whatever the drone happened to be doing} when it broke: noise
-injected as signal, growing with $\pfault$. Bootstrapping instead treats the
-fault as censoring, the return being simply observed no further. The alternative,
-modelling faults \emph{inside} the value function by scaling values by survival
-probability, would require the network to know $\pfault$, exactly the quantity
-Section~\ref{subsec:arch-context} argues a deployed drone cannot know.
+would charge the value function for bad luck, depressing the values of whatever
+the drone was doing when it broke, with the bias growing in $\pfault$.
 
-Three further decisions follow the same discipline. Running out of budget is
-likewise a truncation, so the final window still bootstraps
-\citep{pardo2018time}: the world does not end at turn $T_{\max}$, and treating it
-as terminal would bias values along every long trajectory. The shared terminal
-bonus of Table~\ref{tab:reward} is written retroactively into each other live
-drone's most recent still-pending window, which is then marked terminal, a
-mechanism that requires $n \geq 2$ (with one-step windows nothing is pending to
-credit; the configuration is validated at run start) and that excludes drones
-which broke before the find, since their windows were already flushed: a drone
-that died exploring an empty quadrant should not learn that dying there is worth
-the team's eventual success. Finally, checkpoint selection is shielded from the
-shaped reward: every $1{,}000$ episodes the policy is evaluated near-greedily
-($\varepsilon = 0.05$) on a \emph{fixed} bank of $20$ seeded instances, and a
-new best requires a strictly higher success rate, with mean reward breaking ties
-only at $100\%$ success, so a policy is never preferred for harvesting
-exploration bonuses more efficiently while finding the target less often.
+Three decisions follow the same discipline. Running out of budget is likewise a
+truncation, so the final window still bootstraps \citep{pardo2018time}. The
+shared terminal bonus of Table~\ref{tab:reward} is written retroactively into
+each other live drone's most recent still-pending window, which requires
+$n \geq 2$ and excludes drones that broke before the find, their windows having
+already been flushed: a drone that died exploring an empty quadrant should not
+learn that dying there is worth the team's eventual success. And checkpoint
+selection is shielded from the shaped reward: every $1{,}000$ episodes the policy
+is evaluated near-greedily ($\varepsilon = 0.05$) on a \emph{fixed} bank of $20$
+seeded instances, and a new best requires a strictly higher success rate, mean
+reward breaking ties only at $100\%$ success, so a policy is never preferred for
+harvesting exploration bonuses while finding the target less often.
 
 \subsection{Infrastructure and reproducibility}
 \label{subsec:train-infra}
@@ -131,13 +111,13 @@ randomization values, drones lost to faults, $\varepsilon$ and the learning
 rate), so a run's difficulty mix and its learning progress can be inspected
 jointly; and one seed reproduces the layout \emph{and} the fault sequence, which
 is what makes checkpoints and configurations comparable on identical instances.
-Each job writes its own event file, so Figures~\ref{fig:training-curves}
-and~\ref{fig:training-eval} (the latter in Appendix~\ref{app:figures}) report the
-first tranche, the $30{,}000$ episodes that fitted inside a single allocation.
-They are the informative ones: every logged quantity has flattened by roughly
-episode $7{,}000$ and none trends over the $23{,}000$ episodes that follow, and
-the checkpoint-level learning curve of Figure~\ref{fig:epoch}, reconstructed by
-re-evaluating the saved weights, covers the full $50{,}000$ episodes anyway.
+Each job writes its own event file, so Figure~\ref{fig:training-curves} reports
+the first tranche, the $30{,}000$ episodes that fitted inside a single
+allocation. It is the informative one: every logged quantity has flattened by
+roughly episode $7{,}000$ and none trends over the $23{,}000$ episodes that
+follow, and the checkpoint-level learning curve of Figure~\ref{fig:epoch}
+(Section~\ref{subsec:exp-generalization}), reconstructed by re-evaluating the
+saved weights, covers the full $50{,}000$ episodes anyway.
 
 \begin{figure}[t]
 \centering

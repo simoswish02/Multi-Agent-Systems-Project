@@ -59,8 +59,8 @@
 \begin{abstract}
 \noindent
 We study cooperative target search by a team of drones on a partially
-observable grid, under limited communication, a fixed time budget, and ---
-the defining extension of this work --- the possibility that any drone
+observable grid, under limited communication, a fixed time budget and,
+the defining extension of this work, the possibility that any drone
 permanently breaks at any moment, with no central authority to announce the
 loss. A single Dueling Double DQN with parameter sharing drives every drone
 through one shared forward pass; per-episode domain randomization and a compact
@@ -70,12 +70,12 @@ knowledge is fully decentralized: a wreck emits only a passive distress
 beacon, and crash information spreads through the same range-limited map fusion
 as any other observation, so each drone acts on a sound-but-possibly-stale
 belief about how many teammates remain. We read the resulting system through
-the multi-agent paradigm --- coordination without protocols, environment-%
+the multi-agent paradigm, namely coordination without protocols, environment-%
 mediated (stigmergic) dispersion, an artefact and autonomy analysis, and an
-epistemic account of fault handling --- and evaluate it empirically. The
+epistemic account of fault handling, and we evaluate it empirically. The
 single policy generalizes across every randomization axis, including
-\emph{beyond} its trained ranges on team size, vision, and communication, and
---- most importantly --- degrades \emph{gracefully} under faults: across the
+\emph{beyond} its trained ranges on team size, vision and communication; most
+importantly, it degrades \emph{gracefully} under faults: across the
 entire trained fault range success drops by under six points while the team
 loses, on average, more than half a drone, and even at more than triple the
 trained fault rate it still completes two missions in three, with no cliff. We
@@ -85,17 +85,23 @@ the dual-use nature of a capability whose fault tolerance would make an attack
 swarm as resilient as a rescue one.
 \end{abstract}
 
-% Companion material. To add the demo video, uncomment the last two
-% lines of this block and paste its address in. Note that \url must be
-% handed a literal URL: it reads its argument verbatim, so it cannot be
-% wrapped in a macro or placed inside a conditional.
+% Companion material. The tabular puts the three addresses in one column: the
+% GitLab path alone is 79 characters, so set side by side they overrun the text
+% block. Note that \url must be handed a literal URL, since it reads its
+% argument verbatim and cannot be wrapped in a macro or a conditional.
 \vspace{1.2em}
 \begin{center}
-\small
-\textbf{Source code} \quad
-\url{https://github.com/simoswish02/Multi-Agent-Systems-Project}
-\par\vspace{0.35em}
-\textbf{Video walkthrough} \quad \url{https://youtu.be/az1LtAcZYZo}
+\footnotesize
+% Body font rather than typewriter, at footnotesize: the GitLab path is 79
+% characters, and \url's default \ttfamily at \small overruns the text block by
+% 65pt. Both settings are scoped to this group, so the bibliography's URLs keep
+% their usual style.
+\urlstyle{same}
+\begin{tabular}{@{}r@{\hspace{1.1em}}l@{}}
+\textbf{GitLab repository}  & \url{https://dvcs.apice.unibo.it/pika-lab/courses/ai-ethics/projects/rimondi2526-mas} \\[0.2em]
+\textbf{GitHub repository}  & \url{https://github.com/simoswish02/Multi-Agent-Systems-Project} \\[0.2em]
+\textbf{Video walkthrough}  & \url{https://youtu.be/az1LtAcZYZo}
+\end{tabular}
 \end{center}
 
 \newpage

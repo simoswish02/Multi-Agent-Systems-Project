@@ -23,7 +23,8 @@ periodic checkpoints of the same run.
 
 \paragraph{One-factor-at-a-time protocol.}
 The policy was randomized over five environment factors simultaneously, so the
-natural evaluation is a controlled sweep: we vary \emph{one} factor at a time and
+natural evaluation is a controlled \emph{one-factor-at-a-time} (OFAT) sweep: we
+vary one factor at a time and
 hold the others at a fixed \emph{reference operating point}, namely team size
 $\nagents = 3$, vision $\rvis = 3$, communication $\rcomm = 5$, obstacle density
 $\rho = 0.2$, step budget $T = 200$ and no faults, chosen at the centre of the
@@ -52,8 +53,8 @@ which it would otherwise be incomparable. \emph{Coverage} is the fraction of fre
 cells the team has discovered at episode end; \emph{overlap} is the fraction of
 team-visited cells visited by more than one drone, and \emph{revisits} the mean
 per-drone re-entries, the two redundancy signatures promised in
-Section~\ref{subsec:mas-emergence}. \emph{SPL} (Success weighted by Path Length;
-\citealp{anderson2018evaluation}) weights each success by the ratio of the
+Section~\ref{subsec:mas-emergence}. \emph{SPL} (Success weighted by Path Length)
+\citep{anderson2018evaluation} weights each success by the ratio of the
 optimal spawn-to-target distance to the finder's actual path length, rewarding
 \emph{short} solutions and scoring failures zero; it is our single scalar for
 path quality.
@@ -127,8 +128,8 @@ Budget $T$               & $50 \to 300$     & $49.0 \to 89.8$ & ---             
 Each row sweeps one factor with the others held at the reference operating
 point. ``Success (in-dist.)'' reports the endpoints of the in-distribution
 sweep in the stated direction; the OOD probes extrapolate just beyond the
-training range. Team size, vision and communication generalize essentially
-flatly, including beyond their trained maxima; obstacle density is the one
+training range. Team size, vision and communication all extrapolate without a
+cliff, including beyond their trained maxima; obstacle density is the one
 axis that governs difficulty, and the only one whose OOD extrapolation
 collapses. The obstacle-free case $\rho = 0$ (below the trained floor of
 $0.10$) is a benign extrapolation at $99.0\%$.}
@@ -180,35 +181,46 @@ mostly duplicate each other's ground rather than extend the swept region.
 \centering
 \includegraphics[width=0.95\textwidth]{fig_n_agents.png}
 \caption{Sensitivity to team size $\nagents$. Blue circles are in-distribution
-($1\!\le\!\nagents\!\le\!4$), red squares the OOD extrapolation, shaded bands the
-Wilson $95\%$ CI (success) or $\pm1$ standard deviation (return). Success and SPL
-improve monotonically and extend cleanly beyond the trained maximum, and mission
-time falls from $84.9$ to $42.7$ rounds, a real but sublinear speed-up. The cost
-is congestion (collisions) at the shared spawn corner, while per-drone revisits
-fall: the division-of-labour signature discussed below.}
+($1\!\le\!\nagents\!\le\!4$), red squares the OOD extrapolation $\nagents = 5, 6$,
+shaded bands the Wilson $95\%$ CI (success) or $\pm1$ standard deviation
+(return).}
 \label{fig:sweep-nagents}
 \end{figure}
 
 \paragraph{Vision and communication: robust, with a telling asymmetry.}
-Both sensing axes generalize flatly (Table~\ref{tab:generalization}). Vision has
-the intuitive effect on \emph{coverage}, a wider window discovering more of the
-map per step, so coverage rises monotonically from $46.5\%$ at $\rvis=1$ to
-$69.5\%$ at $\rvis=8$; yet success peaks around $\rvis = 3\text{--}4$ ($88.2\%$)
-and drifts gently down thereafter, in and out of distribution alike, because past
-a point the bottleneck is deciding \emph{where} to go, not seeing farther.
-Communication is the more interesting axis: success is essentially \emph{flat}
-across the entire range, $87\text{--}89\%$, and, strikingly, severing
-communication entirely ($\rcomm = 0$, an OOD probe) costs almost nothing in
-success ($87.6\%$). What communication does buy is \emph{efficiency}. Path
-quality improves steadily (SPL $0.49 \to 0.59$ from $\rcomm = 0$ to $16$),
-redundancy falls as shared maps let drones avoid re-covering each other's ground,
-and, in the effect the per-round metric brings out, the team is markedly
-\emph{quicker}: mission time drops from $61.7$ rounds with communication severed
-to $49.6$ at $\rcomm = 10$, a $20\%$ saving, before flattening. Communication
-thus governs how efficiently the team searches, not whether it succeeds. We take
-this finding up directly as an ablation in
-Section~\ref{subsec:exp-ablations}, as it bears on the coordination analysis of
-Section~\ref{subsec:mas-coordination}.
+Neither sensing axis has a cliff, in or out of distribution
+(Table~\ref{tab:generalization}), but the two are robust in quite different ways.
+Vision genuinely helps, and on every quality metric at once
+(Figure~\ref{fig:sweep-vision}): from $\rvis = 1$ to $\rvis = 6$ coverage rises
+from $46.5\%$ to $62.9\%$ (reaching $69.5\%$ at the OOD radius $\rvis = 8$), SPL
+nearly doubles ($0.33 \to 0.63$), and mission time falls from $81.5$ rounds to
+$43.0$, close to a halving. What saturates is the \emph{find rate}: success
+climbs steeply out of myopia ($70.6\%$ at $\rvis = 1$ to $87.6\%$ at
+$\rvis = 3$), peaks at $88.2\%$ around $\rvis = 4$, then drifts gently down in
+and out of distribution alike, because past that point the bottleneck is deciding
+\emph{where} to go rather than seeing farther. A wider window therefore keeps
+buying speed and path quality long after it has stopped buying missions.
+
+Communication is the more interesting axis, because there the success curve
+really is flat: $87\text{--}90\%$ across the entire range, and severing fusion
+outright ($\rcomm = 0$, an OOD probe) still yields $87.6\%$. What communication
+buys is efficiency, and it buys a lot of it: between $\rcomm = 0$ and
+$\rcomm = 10$, SPL rises from $0.492$ to $0.578$ and mission time falls from
+$61.7$ rounds to $49.6$, each close to a fifth, while redundancy drops as shared
+maps let drones avoid re-covering each other's ground. The asymmetry, then, is
+that vision governs both \emph{whether} and \emph{how well} the team searches,
+while communication governs only \emph{how well}. We take the latter up directly
+as an ablation in Section~\ref{subsec:exp-ablations}, as it bears on the
+coordination analysis of Section~\ref{subsec:mas-coordination}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_vision.png}
+\caption{Sensitivity to vision radius $\rvis$. Blue circles are in-distribution
+($1\!\le\!\rvis\!\le\!6$), red squares the OOD probes $\rvis = 7, 8$, shaded
+bands the Wilson $95\%$ CI (success) or $\pm1$ standard deviation (return).}
+\label{fig:sweep-vision}
+\end{figure}
 
 \paragraph{Density and budget: the difficulty axes.}
 Obstacle density is the one factor that dominates the task
@@ -219,7 +231,12 @@ collapses out-of-distribution to $34.6\%$ and $24.2\%$ at $\rho = 0.35, 0.40$,
 the only axis whose extrapolation fails outright. The mechanism is legible in the
 companion panels: as clutter rises, corridors narrow, drones are funnelled
 together (collisions and per-drone revisits climb sharply), coverage drops, and
-SPL falls as detours lengthen the winning path. The step budget behaves as
+SPL falls as detours lengthen the winning path. Time-to-find is the one panel
+there not to read as a difficulty signal: averaged over successful episodes only,
+its \emph{drop} at the OOD densities ($66.4$ rounds at $\rho = 0.30$ against
+$21.1$ at $\rho = 0.40$) is survivorship, since at $24.2\%$ success the few
+episodes that still finish are those whose target happened to lie near the spawn
+corner. The step budget behaves as
 expected of a pure time constraint: success rises with $T$ ($49.0\%$ at $T=50$ to
 $89.8\%$ at $T=300$) with diminishing returns, since a generous budget only helps
 episodes that were close to succeeding anyway.
@@ -227,21 +244,16 @@ episodes that were close to succeeding anyway.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\textwidth]{fig_density.png}
-\caption{Sensitivity to obstacle density $\rho$: the one axis that governs
-difficulty, and the one whose OOD extrapolation (shaded, $\rho > 0.30$) degrades
-sharply. The redundancy panel makes the mechanism concrete, since clutter funnels
-the team together, so collisions and per-drone revisits climb as success and path
-quality fall. Time-to-find is the one panel not to read as a difficulty signal:
-averaged over successful episodes only, its drop at the OOD densities ($66.4$
-rounds at $\rho = 0.30$ against $21.1$ at $\rho = 0.40$) is survivorship, since
-at $24.2\%$ success the few episodes that still finish are those whose target
-happened to lie near the spawn corner.}
+\caption{Sensitivity to obstacle density $\rho$, the one axis that governs
+difficulty. Shaded points ($\rho > 0.30$) are the OOD extrapolation. Note that
+time-to-find, averaged over successful episodes only, is a survivorship
+statistic at those densities rather than a difficulty signal.}
 \label{fig:sweep-density}
 \end{figure}
 
 \paragraph{Learning curve.}
 Re-evaluating the periodic checkpoints at the reference operating point
-(Figure~\ref{fig:epoch}, Appendix~\ref{app:figures}) shows success rising to a
+(Figure~\ref{fig:epoch}) shows success rising to a
 plateau around $80\text{--}85\%$ by roughly episode $25{,}000$ and holding, with
 SPL continuing to inch up afterward: the policy keeps refining \emph{how} it
 reaches targets after the \emph{whether} has largely converged. The intermediate
@@ -250,12 +262,20 @@ in the stretch where exploration has long since floored, $\varepsilon$ hitting
 $0.05$ at episode $5{,}990$, while the learning rate is still
 $67\text{--}82\%$ of its peak on the cosine schedule: large updates against a
 nearly greedy, self-generated state distribution. It recovers without
-intervention as the annealing proceeds, and the in-training evaluation logged
-online (Figure~\ref{fig:training-eval}), which uses a different instance bank and
-was recorded independently of these re-evaluations, places its own local minima
-in the same stretch, at episodes $16{,}000$ and $21{,}000$. This curve is the
-greedy, $300$-seed complement to the online training scalars of
+intervention as the annealing proceeds, and the greedy evaluation logged online
+during the run itself, which uses a different instance bank and was recorded
+independently of these re-evaluations, places its own local minima in the same
+stretch, at episodes $16{,}000$ and $21{,}000$. This curve is the greedy,
+$300$-seed complement to the online training scalars of
 Figure~\ref{fig:training-curves}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{fig_epoch.png}
+\caption{Learning curve: every periodic checkpoint of the final run, evaluated
+greedily at the reference operating point ($300$ seeds per checkpoint).}
+\label{fig:epoch}
+\end{figure}
 
 \subsection{Fault robustness}
 \label{subsec:exp-faults}
@@ -326,11 +346,8 @@ quietly.
 \centering
 \includegraphics[width=0.9\textwidth]{fig_fault.png}
 \caption{Fault robustness. Learned policy (blue) versus the BFS auto-nav
-hybrid (green); shaded region is OOD ($\pfault > 0.003$). Success and SPL
-decline smoothly with no cliff across a $3.3\times$ extrapolation of the fault
-rate, while the mean number of drones lost (right) grows as expected. The
-auto-nav skyline runs a near-constant $2\text{--}3$ points above the policy,
-indicating the residual gap is in the final approach, not in fault handling.}
+hybrid (green); the shaded region is OOD ($\pfault > 0.003$). Panels: success,
+SPL and the mean number of drones lost per episode.}
 \label{fig:fault}
 \end{figure}
 
@@ -354,15 +371,10 @@ the policy.
 \centering
 \includegraphics[width=0.95\textwidth]{fig_nbroken.png}
 \caption{Opening up the fault aggregate ($500$ seeds per fault level,
-reference operating point, $\nagents = 3$). \emph{(a)} Composition of
-episodes by number of drones lost: within the trained range most episodes
-still finish with a complete team, while at the OOD point $\pfault = 0.01$
-total wipe-outs become common. \emph{(b)} Success rate conditioned on the
-number of survivors, pooled over all fault levels. Degradation with team
-attrition is gradual, a single surviving drone still succeeding in over half
-of its episodes, which is what makes the aggregate curve of
-Figure~\ref{fig:fault} smooth. The zero-survivor bar is $0\%$ by
-construction: an all-dead team truncates the episode.}
+reference operating point, $\nagents = 3$). \emph{(a)} Composition of episodes
+by number of drones lost, per fault level. \emph{(b)} Success rate conditioned
+on the number of survivors, pooled over all fault levels; the zero-survivor bar
+is $0\%$ by construction, an all-dead team truncating the episode.}
 \label{fig:nbroken}
 \end{figure}
 
@@ -391,35 +403,42 @@ though it may matter more for path quality.
 
 The communication axis doubles as a clean ablation, because $\rcomm = 0$ removes
 map fusion entirely without retraining or changing anything else.
-Figure~\ref{fig:sweep-comm} isolates it. Disabling communication leaves the
-success rate essentially unchanged ($87.6\%$ at $\rcomm = 0$ against
-$87\text{--}90\%$ over the whole range), and its effect on the other metrics is
-real but modest: SPL improves by about $0.09$ and per-drone revisits fall as
-range grows, because drones that can read each other's maps waste less effort
-re-covering explored ground.
+Figure~\ref{fig:sweep-comm} isolates it, and the result splits cleanly in two.
+Fusion is not what lets the team \emph{find} the target: success is $87.6\%$ with
+communication severed against $87\text{--}90\%$ over the whole range, a spread
+well inside the confidence intervals. It is what lets the team find it
+\emph{well}. Switching fusion on is worth close to a fifth of the team's
+efficiency on every measure the harness records. Between $\rcomm = 0$ and the
+trained maximum $\rcomm = 12$, SPL rises from $0.492$ to $0.587$ ($+19\%$),
+per-drone revisits fall from $9.9$ to $8.6$ ($-13\%$) and inter-drone overlap
+from $26.6\%$ to $21.0\%$ ($-21\%$), while mission time drops from $61.7$ rounds
+to $49.6$ at its best ($-20\%$). For a mechanism that costs nothing
+beyond being within range of a teammate, and that no reward term ever instructed
+the policy to exploit, a uniform fifth off the cost of a mission is a substantial
+return.
 
-The reading matters for the multi-agent analysis. It does \emph{not} say
-communication is useless; it says that on this task, with monotone accumulating
-maps and a strong dispersion incentive, most of the coordination is carried by
-the \emph{environment-mediated, stigmergic} channel of
+The reading matters for the multi-agent analysis. Communication is not what
+\emph{creates} coordination here: with the channel cut the team still disperses
+and still succeeds, which says that the dispersion itself is carried by the
+\emph{environment-mediated, stigmergic} channel of
 Section~\ref{subsec:mas-coordination}, drones spreading out because regions they
-or teammates have swept are made unrewarding, rather than by the \emph{direct}
-map-fusion channel. Communication refines coordination, giving shorter and less
-redundant paths; it does not, here, create it. This is a concrete instance of the
-coordination-without-protocols theme of Section~\ref{sec:mas}, and an honest
-limitation of the current reward design: a task that genuinely required
-information sharing (a target visible only from afar, say, or heterogeneous
-sensing) would exercise the fusion channel far harder than target-in-a-maze
-search does.
+or their teammates have swept are made unrewarding. What fusion adds is
+efficiency, and it adds it through the same artefact, the accumulated map, rather
+than through any protocol: two coordination channels sharing one representation,
+complementary rather than redundant, which is as concrete an instance of the
+coordination-without-protocols theme of Section~\ref{sec:mas} as the system
+offers. The honest caveat runs the other way from the usual one: because the find
+rate is insensitive here, this sweep \emph{understates} what fusion would be
+worth on a task that genuinely required information sharing (a target visible
+only from afar, say, or heterogeneous sensing), where it would have to carry
+success and not merely efficiency.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\textwidth]{fig_comm.png}
 \caption{Communication ablation via the $\rcomm$ sweep. The leftmost point
-$\rcomm = 0$ (OOD, shaded) fully disables map fusion. Success is flat across
-the entire range, including with communication severed; the gains from
-communication show up in path quality (SPL) and reduced redundancy, not in
-find rate.}
+$\rcomm = 0$ (OOD, shaded) fully disables map fusion; $\rcomm = 14, 16$ are the
+OOD probes above the trained maximum.}
 \label{fig:sweep-comm}
 \end{figure}
 
@@ -472,11 +491,9 @@ interaction grids single out.
 \begin{subfigure}{0.49\textwidth}
   \includegraphics[width=\textwidth]{fig_heatmap_vision_density.png}
 \end{subfigure}
-\caption{Two-factor interaction grids ($300$ seeds per cell). Left: success
-and SPL are driven by team size, essentially flat along communication range.
-Right: obstacle density sets the success band; vision helps mainly in open
-maps. Together they isolate team size and density as the study's two dominant
-factors.}
+\caption{Two-factor interaction grids ($300$ seeds per cell): team size
+$\times$ communication range (left) and vision $\times$ obstacle density
+(right).}
 \label{fig:heatmaps}
 \end{figure}
 

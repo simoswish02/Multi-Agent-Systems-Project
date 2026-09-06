@@ -47,9 +47,10 @@ sharing \citep{gupta2017cooperative}: a single Dueling Double DQN
 consuming that drone's private maps through a convolutional architecture with an
 attention bottleneck, and trained on the pooled experience of the whole team.
 Rather than fixing one operating condition, every training episode randomizes the
-regime (vision radius, communication range, team size, obstacle density and fault
-probability; \citealp{tobin2017domain}), and the sampled parameters that a real
-drone could plausibly know are fed back to the network as a context vector,
+regime \citep{tobin2017domain}, sampling the vision radius, the communication
+range, the team size, the obstacle density and the fault probability. The sampled
+parameters that a real drone could plausibly know are fed back to the network as
+a context vector,
 together with two per-drone quantities: an identity, which breaks the symmetry of
 parameter sharing and lets co-located drones adopt different roles from the first
 step, and the drone's own \emph{belief} about how many teammates remain
@@ -104,7 +105,7 @@ The report makes the following contributions:
   \item \emph{An empirical demonstration of generalization and graceful
     degradation} (Section~\ref{sec:experiments}): a seeded,
     one-factor-at-a-time protocol ($500$ episodes per configuration) showing
-    that the policy holds essentially flat across team size, vision and
+    that the policy generalizes without a cliff across team size, vision and
     communication, including \emph{beyond} the ranges it was trained on, while
     obstacle density is the one axis that genuinely governs difficulty; and, as
     the headline result, that success falls by under six points across the

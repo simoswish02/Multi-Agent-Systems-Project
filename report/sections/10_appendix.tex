@@ -177,25 +177,12 @@ python testing/evaluate_policy.py --axis epoch    --seeds 300
 \section{Additional Figures}
 \label{app:figures}
 
-For completeness this appendix collects the figures referenced from the body but
-not shown there. Figures~\ref{fig:app-vision} and~\ref{fig:app-maxsteps} give the
-two one-factor sweeps summarized in Table~\ref{tab:generalization}, namely the
-vision-radius and step-budget axes, with the six panels of each following the
-layout of Figures~\ref{fig:sweep-nagents} and~\ref{fig:sweep-density}.
-Figures~\ref{fig:schedules}--\ref{fig:epoch} then document the training run of
-Section~\ref{sec:training}: its two per-episode schedules, the in-training
-evaluation that drives checkpoint selection, and the checkpoint-level learning
-curve.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{fig_vision.png}
-\caption{Sensitivity to vision radius $\rvis$. Coverage rises monotonically
-with sight (top right), but success saturates around $\rvis = 3\text{--}4$:
-past a point the bottleneck is deciding where to go, not seeing farther. The
-OOD radii $\rvis = 7, 8$ (shaded) degrade only slightly.}
-\label{fig:app-vision}
-\end{figure}
+For completeness this appendix collects the two figures referenced from the body
+but not shown there. Figure~\ref{fig:app-maxsteps} gives the step-budget sweep
+summarized in Table~\ref{tab:generalization}, with the six panels following the
+layout of Figures~\ref{fig:sweep-nagents} and~\ref{fig:sweep-density}, and
+Figure~\ref{fig:schedules} documents the two per-episode schedules of the
+training run of Section~\ref{sec:training}.
 
 \begin{figure}[h]
 \centering
@@ -221,28 +208,3 @@ distribution.}
 \label{fig:schedules}
 \end{figure}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.86\textwidth]{fig_training_eval.png}
-\caption{In-training greedy evaluation of the same run, executed every $1{,}000$
-episodes on the fixed bank of $20$ seeded instances that drives checkpoint
-selection; \emph{(a)} success rate and \emph{(b)} mean return, best values
-circled. These levels are not comparable with those of
-Section~\ref{sec:experiments}, since this bank samples the \emph{full}
-randomization ranges (solo drones, $\rvis{=}1$, faults active) whereas the
-evaluation there measures at the reference operating point. The
-$5$-point sawtooth in \emph{(a)} is the quantization of a $20$-instance bank,
-which is the noise the strict-improvement selection rule is designed not to
-chase. Both panels flatten by around episode $7{,}000$.}
-\label{fig:training-eval}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.86\textwidth]{fig_epoch.png}
-\caption{Learning curve: every periodic checkpoint of the final run,
-evaluated greedily at the reference operating point ($300$ seeds). Success
-plateaus near $85\%$ while SPL keeps improving, indicating late refinement of
-path quality rather than of find rate.}
-\label{fig:epoch}
-\end{figure}

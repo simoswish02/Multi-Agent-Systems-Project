@@ -40,10 +40,13 @@ success. Most importantly, degradation under faults is \emph{graceful}: across
 the entire trained fault range success fell by under six points while the team
 shed, on average, more than half a drone, and even at a fault rate more than
 triple the trained maximum the system still completed two missions in three, with
-no cliff. The limits were equally clear: obstacle density is the one axis whose
-extrapolation collapses; communication, on this task, refines coordination but
-does not create it; and two of the three emergence signatures, together with the
-belief-lag question, remain defined but uninstrumented.
+no cliff. The sweeps also separated two competences the success rate conflates:
+vision governs both whether and how well the team searches, while communication
+governs only how well, though it governs it substantially, map fusion buying
+close to a fifth in path quality, mission time and redundancy at no cost beyond
+proximity. The limits were equally clear: obstacle density is the one axis whose
+extrapolation collapses; and two of the three emergence signatures, together with
+the belief-lag question, remain defined but uninstrumented.
 Section~\ref{sec:ethics} then argued that the capability is irreducibly
 dual-use, the fault tolerance that makes a search-and-rescue swarm robust being
 what would make an attack swarm resilient; mapped the civilian system onto the
@@ -70,7 +73,8 @@ require retraining a policy each. None of these changes the architecture: they
 are instrumentation and compute, and they would sharpen the claims already made.
 
 Three directions reach further. On coordination, the finding that communication
-contributes little here is partly a property of the task and partly of the
+buys efficiency but not find rate here is partly a property of the task and
+partly of the
 design: \emph{learned} messages would let the system decide \emph{what} to share,
 and a task that genuinely rewarded information sharing (a target visible only
 from afar, heterogeneous sensors, partial views that must be combined) would

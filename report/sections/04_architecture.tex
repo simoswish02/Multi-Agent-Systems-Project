@@ -399,7 +399,7 @@ For quantitative work, \texttt{eval\_checkpoints.py} ranks checkpoints on
 identical fixed-seed instance sets, the same seeds reproducing the same layouts
 \emph{and} fault sequences, while \texttt{testing/\allowbreak evaluate\_policy.py}
 runs the
-one-factor-at-a-time sweeps of Section~\ref{sec:experiments}. Both support an
+one-factor-at-a-time (OFAT) sweeps of Section~\ref{sec:experiments}. Both support an
 optional \emph{auto-navigation} override: once a drone's maps contain the target,
 a BFS planner on its \emph{known} map (unknown cells optimistically assumed free,
 replanned every step) steers it there deterministically. The override exists to

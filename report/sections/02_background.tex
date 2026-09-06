@@ -70,10 +70,11 @@ choice of action barely matters and in a few it is critical. And an
 \emph{$n$-step return} accumulates real rewards over a window of $m$ steps before
 bootstrapping,
 $y = \sum_{k=0}^{m-1} \gamma^k r_{t+k} + \gamma^m\, Q_{\theta^-}(s_{t+m},\cdot)$,
-trading a little extra variance (and, off-policy, a formally uncorrected sampling
-mismatch that works well in practice; \citealp{hessel2018rainbow}) for much
-faster credit propagation, a sensible trade when a sparse success signal must
-travel backwards across long trajectories.
+trading a little extra variance for much faster credit propagation, a sensible
+trade when a sparse success signal must travel backwards across long
+trajectories. Off-policy, the window also introduces a sampling mismatch that is
+formally uncorrected here, an approximation that works well in practice
+\citep{hessel2018rainbow}.
 
 \paragraph{Termination vs.\ truncation.}
 One subtlety becomes central in this project. When a window ends in a
