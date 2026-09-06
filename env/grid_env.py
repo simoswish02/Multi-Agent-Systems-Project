@@ -213,16 +213,22 @@ class DroneSearchEnv(gym.Env):
         mg = self.grid_size
         na = self.n_agents
 
-        self.grid, self.target_pos = generate_grid(
-            self.H, self.W, self.obstacle_density, self.rng
-        )
-
-        # Pick one of the four corners at random each episode.
+        # Pick one of the four corners FIRST, then generate the layout around
+        # it: generate_grid guarantees a free spawn cell and a reachable target
+        # only for the cell it is given. Drawing the corner afterwards (as an
+        # earlier version did) leaves the guarantee anchored to (0,0) while the
+        # team spawns elsewhere, which makes a density-dependent fraction of
+        # episodes unsolvable.
         # Negative indices wrap to the last row/column (gs-1).
         corner_idx = self.spawn_corner if self.spawn_corner is not None \
             else int(self.rng.integers(0, 4))
         cr, cc = _SPAWN_CORNERS[corner_idx]
         start = (int(cr % mg), int(cc % mg))
+
+        self.grid, self.target_pos = generate_grid(
+            self.H, self.W, self.obstacle_density, self.rng, start=start
+        )
+
         self.agent_pos = [start for _ in range(na)]
 
         self.agent_visited    = np.zeros((na, mg, mg), dtype=np.float32)

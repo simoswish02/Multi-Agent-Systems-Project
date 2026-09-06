@@ -2,12 +2,20 @@ import numpy as np
 from collections import deque
 
 
-def generate_grid(H: int, W: int, obstacle_density: float, rng: np.random.Generator):
+def generate_grid(H: int, W: int, obstacle_density: float, rng: np.random.Generator,
+                  start: tuple = (0, 0)):
     """
     Generate a random grid of size (H, W) with static obstacles.
-    Guarantees:
-      - Cell (0,0) is always free (agent start).
-      - The target cell is always reachable from (0,0).
+
+    Guarantees, with respect to the ``start`` cell the team will spawn on:
+      - ``start`` is always free.
+      - The target cell is always reachable from ``start``.
+
+    ``start`` must be the cell the drones actually spawn on. Passing the wrong
+    one silently produces unsolvable instances: the guarantee only transfers
+    between corners when the free space happens to be connected, which at
+    obstacle densities of 0.2-0.4 it frequently is not.
+
     Returns:
       grid: np.ndarray (H, W), 0=free, 1=obstacle
       target_pos: (row, col) tuple
@@ -15,24 +23,24 @@ def generate_grid(H: int, W: int, obstacle_density: float, rng: np.random.Genera
     max_attempts = 200
     for _ in range(max_attempts):
         grid = (rng.random((H, W)) < obstacle_density).astype(np.int32)
-        grid[0, 0] = 0  # start always free
+        grid[start] = 0  # spawn cell always free
 
-        # Collect free cells reachable from (0,0)
-        reachable = bfs_reachable(grid, (0, 0))
+        # Collect free cells reachable from the spawn corner
+        reachable = bfs_reachable(grid, start)
 
         # Need at least 2 reachable cells (start + target)
         if len(reachable) < 2:
             continue
 
         # Choose a target from reachable cells (excluding start)
-        candidates = [pos for pos in reachable if pos != (0, 0)]
+        candidates = [pos for pos in reachable if pos != start]
         idx = int(rng.integers(0, len(candidates)))
         target_pos = candidates[idx]
         return grid, target_pos
 
-    # Fallback: empty grid
+    # Fallback: empty grid, target in the opposite corner from the spawn
     grid = np.zeros((H, W), dtype=np.int32)
-    target_pos = (H - 1, W - 1)
+    target_pos = (H - 1 - start[0], W - 1 - start[1])
     return grid, target_pos
 
 
