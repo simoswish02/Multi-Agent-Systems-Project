@@ -22,7 +22,7 @@ to the network as a context vector.
 |---|---|
 | 📄 **Report** | [`report/main.pdf`](report/main.pdf) — the full write-up (49 pp.), also the deep-dive reference for this code |
 | 🎬 **Video walkthrough** | **<https://youtu.be/az1LtAcZYZo>** (~4 min, generated end to end from code) |
-| 🧠 **Trained weights** | HUGGINGFACE-URL-PLACEHOLDER |
+| 🧠 **Trained weights** | [`simoswish/MAS_MultiDroneExploration`](https://huggingface.co/simoswish/MAS_MultiDroneExploration) on Hugging Face |
 | 📊 **Results** | [`testing_results/`](testing_results/) — every CSV and figure behind Section 7 |
 | 🔬 **Analysis** | [`testing/analysis.ipynb`](testing/analysis.ipynb) — executed, the single source of the report's figures |
 
@@ -73,10 +73,15 @@ The policy behind every number in the report is
 `mas_50k_dr_faults_ep50000.pt`, the final checkpoint of the 50,000-episode run.
 It is ~270 MB, too large to track here, and is published on Hugging Face:
 
-**HUGGINGFACE-URL-PLACEHOLDER**
+**<https://huggingface.co/simoswish/MAS_MultiDroneExploration>**
 
-Download it into `checkpoints/` and the evaluation commands below run as
-written. Training from scratch needs no checkpoint.
+```bash
+huggingface-cli download simoswish/MAS_MultiDroneExploration \
+    mas_50k_dr_faults_ep50000.pt --local-dir checkpoints/
+```
+
+With the file in `checkpoints/`, the evaluation commands below run as written.
+Training from scratch needs no checkpoint.
 
 ## Usage
 

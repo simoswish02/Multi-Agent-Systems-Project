@@ -160,10 +160,11 @@ the $50{,}000$-episode run,
 \texttt{mas\_\allowbreak 50k\_\allowbreak dr\_\allowbreak faults\_\allowbreak ep50000.pt}.
 It is too large for the repository and is published separately:
 \begin{center}\footnotesize\urlstyle{same}
-HUGGINGFACE-URL-PLACEHOLDER
+\url{https://huggingface.co/simoswish/MAS_MultiDroneExploration}
 \end{center}
-Place it under \texttt{checkpoints/} and pass it to \texttt{--checkpoint};
-the \texttt{q\_net} entry of the saved dictionary holds the network weights.
+Place it under \texttt{checkpoints/} and pass it to \texttt{--checkpoint}
+(written \texttt{\$CKPT} below); the \texttt{q\_net} entry of the saved
+dictionary holds the network weights.
 
 \paragraph{Environment setup.}
 \begin{verbatim}
@@ -177,9 +178,8 @@ conda activate rl-drone
 # Training (curriculum from configs/default.yaml; --resume to continue)
 python main.py --mode train
 
-# Qualitative inspection
-python main.py --mode eval --checkpoint checkpoints/best.pt \
-                                          [--fault-prob P] [--auto-nav]
+# Qualitative inspection (CKPT = the published checkpoint above)
+python main.py --mode eval --checkpoint $CKPT [--fault-prob P] [--auto-nav]
 python main.py --mode simulate            # GUI: fault slider, auto-nav toggle
 
 # The experiments of Section 7 (writes testing_results/{csv,plots})
@@ -187,7 +187,9 @@ python testing/evaluate_policy.py --axis all      --seeds 500
 python testing/evaluate_policy.py --axis fault    --seeds 500 --auto-nav
 python testing/evaluate_policy.py --axis heatmaps --seeds 300
 python testing/evaluate_policy.py --axis epoch    --seeds 300
-# then run testing/analysis.ipynb to regenerate the figures
+# Every figure in this report ("make figures")
+jupyter nbconvert --to notebook --execute --inplace testing/analysis.ipynb
+python testing/make_training_figures.py
 \end{verbatim}
 
 \FloatBarrier
