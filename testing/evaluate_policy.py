@@ -113,10 +113,14 @@ SWEEPS = {
                   "ood": [7, 8]},
     "comm":      {"kind": "ctx", "param": "comm_range",       "id": [2, 4, 6, 8, 10, 12],
                   "ood": [0, 14, 16]},
-    "density":   {"kind": "env", "param": "obstacle_density", "id": [0.0, 0.1, 0.15, 0.2, 0.25, 0.3],
-                  "ood": [0.35, 0.4]},
-    "max_steps": {"kind": "env", "param": "max_steps",        "id": [50, 100, 150, 200, 300],
-                  "ood": []},
+    # rho = 0 is BELOW the trained floor of 0.10, so it is an OOD probe on the
+    # low side, not an in-distribution point (training DR range: [0.10, 0.30]).
+    "density":   {"kind": "env", "param": "obstacle_density", "id": [0.1, 0.15, 0.2, 0.25, 0.3],
+                  "ood": [0.0, 0.35, 0.4]},
+    # max_steps is NOT a DR axis: training fixed it at 200, so every other
+    # budget is off-distribution. Only 200 belongs in "id".
+    "max_steps": {"kind": "env", "param": "max_steps",        "id": [200],
+                  "ood": [50, 100, 150, 300]},
     # Robustness to random drone loss (the MAS-proposal experiment): id points
     # cover the training DR range [0, 0.003]; ood pushes beyond it.
     "fault":     {"kind": "env", "param": "fault_prob",       "id": [0.0, 0.001, 0.002, 0.003],
