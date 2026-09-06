@@ -235,9 +235,11 @@ __marimo__/
 # Course material & report planning notes (local only)
 /summaries/
 /report/planning/
+/delivery_info/
 
-# LaTeX build artifacts
-report/main.pdf
+# LaTeX build artifacts. main.pdf is the exception: the compiled report is a
+# deliverable of this project, so it is tracked rather than ignored.
+!report/main.pdf
 report/*.aux
 report/*.bbl
 report/*.blg

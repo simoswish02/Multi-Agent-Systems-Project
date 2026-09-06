@@ -13,8 +13,10 @@ dependencies:
   - pytorch::pytorch>=2.0
   - pytorch::torchvision
   - pytorch::torchaudio
-  - pytorch::pytorch-cuda=11.8   # ← per GTX 1660 Ti (CUDA 11.x)
+  - pytorch::pytorch-cuda=11.8   # matches the GTX 1660 Ti (CUDA 11.x)
   - conda-forge::pygame>=2.5
+  - pandas>=2.0
+  - matplotlib>=3.7
   - pip:
     - gymnasium>=0.29
     - tensorboard>=2.14
