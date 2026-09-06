@@ -27,8 +27,9 @@ natural evaluation is a controlled \emph{one-factor-at-a-time} (OFAT) sweep: we
 vary one factor at a time and
 hold the others at a fixed \emph{reference operating point}, namely team size
 $\nagents = 3$, vision $\rvis = 3$, communication $\rcomm = 5$, obstacle density
-$\rho = 0.2$, step budget $T = 200$ and no faults, chosen at the centre of the
-training ranges of Table~\ref{tab:notation}. This maps each axis without the
+$\rho = 0.2$, step budget $T = 200$ and no faults, which is the configuration
+file's default operating point and sits near the centre of the training ranges
+of Table~\ref{tab:notation}. This maps each axis without the
 exponential cost of a full grid; the two interactions we do examine jointly are
 reported as heatmaps in Section~\ref{subsec:exp-qualitative}. Each configuration
 point is evaluated on the \emph{same} bank of $500$ seeds (learning-curve and
@@ -36,7 +37,10 @@ heatmap points use $300$); a seed fixes the obstacle layout, target, spawn corne
 and, under faults, the entire fault sequence, so points differ only in the factor
 being swept. In every plot the range actually seen in training is drawn on a
 white background and the extrapolation beyond it (\emph{out-of-distribution},
-OOD) on a shaded one.
+OOD) on a shaded one. The step budget is the one axis to which this
+distinction does not apply: $T$ was never randomized, training having fixed
+$T = 200$ throughout, so every other value on that axis is off-distribution and
+no OOD \emph{probe} can be singled out.
 
 \paragraph{Metrics.}
 We report the task-level metrics defined in
@@ -70,7 +74,11 @@ therefore read success rate, not return, as the primary metric throughout.
 
 At the reference operating point the policy reaches the target in $87.6\%$ of
 episodes (Wilson CI $[84.4, 90.2]$), discovering $53.7\%$ of the free space with
-an SPL of $0.541$: the anchor every one-factor sweep below passes through. One
+an SPL of $0.541$: the anchor every one-factor sweep below passes through. The
+learning curve of Figure~\ref{fig:epoch} ends slightly lower, at $85.0\%$, for
+the same checkpoint at the same operating point; the two reconcile exactly, that
+curve being computed on the $300$-seed prefix ($2000$--$2299$) of this $500$-seed
+bank. One
 plotting convention holds throughout: bounded panels are drawn on axes fitted to
 the data plus the confidence band, so that trends of a few points remain legible;
 map coverage is the exception and keeps the full $0\text{--}100\%$ range, its
@@ -120,19 +128,24 @@ and auto-nav references are the informative comparisons.
 Team size $\nagents$      & $1 \to 4$        & $71.0 \to 89.2$ & $5,\,6$          & $89.6,\,90.4$ \\
 Vision $\rvis$            & $1 \to 6$        & $70.6 \to 87.2$ & $7,\,8$          & $87.0,\,85.6$ \\
 Comm.\ $\rcomm$           & $2 \to 12$       & $87.4 \to 89.0$ & $0,\,14,\,16$    & $87.6,\,88.0,\,89.6$ \\
-Density $\rho$            & $0.30 \to 0.10$  & $53.4 \to 96.2$ & $0.35,\,0.40$    & $34.6,\,24.2$ \\
-Budget $T$               & $50 \to 300$     & $49.0 \to 89.8$ & ---              & --- \\
+Density $\rho$            & $0.30 \to 0.10$  & $53.4 \to 96.2$ & $0,\,0.35,\,0.40$ & $99.0,\,34.6,\,24.2$ \\
+Budget $T$\,$^\dagger$    & $50 \to 300$     & $49.0 \to 89.8$ & ---              & --- \\
 \bottomrule
 \end{tabular}
 \caption{Generalization summary (greedy policy, $500$ seeds per point).
 Each row sweeps one factor with the others held at the reference operating
 point. ``Success (in-dist.)'' reports the endpoints of the in-distribution
-sweep in the stated direction; the OOD probes extrapolate just beyond the
-training range. Team size, vision and communication all extrapolate without a
-cliff, including beyond their trained maxima; obstacle density is the one
-axis that governs difficulty, and the only one whose OOD extrapolation
-collapses. The obstacle-free case $\rho = 0$ (below the trained floor of
-$0.10$) is a benign extrapolation at $99.0\%$.}
+sweep in the stated direction; the OOD probes extrapolate beyond the
+training range on either side. Team size, vision and communication all
+extrapolate without a cliff, including beyond their trained maxima; obstacle
+density is the one axis that governs difficulty, and the only one whose OOD
+extrapolation collapses, though a large part of that collapse is the instance
+distribution rather than the policy (Section~\ref{subsec:exp-generalization}).
+The obstacle-free case $\rho = 0$ lies below the trained floor of $0.10$ and is
+a benign extrapolation at $99.0\%$.
+$^\dagger$~The step budget was never randomized (training fixed $T = 200$), so
+this row is an operating-condition sweep rather than an in/out-of-distribution
+one and admits no OOD probe.}
 \label{tab:generalization}
 \end{table}
 
@@ -206,7 +219,7 @@ really is flat: $87\text{--}90\%$ across the entire range, and severing fusion
 outright ($\rcomm = 0$, an OOD probe) still yields $87.6\%$. What communication
 buys is efficiency, and it buys a lot of it: between $\rcomm = 0$ and
 $\rcomm = 10$, SPL rises from $0.492$ to $0.578$ and mission time falls from
-$61.7$ rounds to $49.6$, each close to a fifth, while redundancy drops as shared
+$61.7$ rounds to $49.6$, gains of $17\%$ and $20\%$, while redundancy drops as shared
 maps let drones avoid re-covering each other's ground. The asymmetry, then, is
 that vision governs both \emph{whether} and \emph{how well} the team searches,
 while communication governs only \emph{how well}. We take the latter up directly
@@ -236,16 +249,49 @@ there not to read as a difficulty signal: averaged over successful episodes only
 its \emph{drop} at the OOD densities ($66.4$ rounds at $\rho = 0.30$ against
 $21.1$ at $\rho = 0.40$) is survivorship, since at $24.2\%$ success the few
 episodes that still finish are those whose target happened to lie near the spawn
-corner. The step budget behaves as
+corner.
+
+Part of this collapse, however, is not a policy failure at all. As noted in
+Section~\ref{subsec:prob-scenario}, reachability is guaranteed only from the
+reference corner $(0,0)$ while the team spawns on a uniformly chosen one, so a
+fraction of instances have no solution to find. Running a breadth-first search
+from the actual spawn on the very same $500$ seeds gives the \emph{solvable}
+fraction, and hence the highest success rate any controller could reach:
+
+\begin{center}
+\small
+\begin{tabular}{lcccccccc}
+\toprule
+$\rho$ & $0$ & $0.10$ & $0.15$ & $0.20$ & $0.25$ & $0.30$ & $0.35$ & $0.40$ \\
+\midrule
+Solvable [\%]          & $100.0$ & $98.6$ & $95.8$ & $91.4$ & $80.6$ & $65.4$ & $45.6$ & $30.4$ \\
+Success [\%]           & $99.0$  & $96.2$ & $94.4$ & $87.6$ & $75.6$ & $53.4$ & $34.6$ & $24.2$ \\
+Of achievable [\%]     & $99.0$  & $97.6$ & $98.5$ & $95.8$ & $93.8$ & $81.7$ & $75.9$ & $79.6$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Read this way the axis tells a more honest story: most of the drop is the
+instance distribution becoming unsolvable rather than the policy degrading, and
+even at the far OOD point the team still finds four targets in five of those
+that \emph{can} be found. Genuine degradation is present, and is concentrated
+between $\rho = 0.25$ and $\rho = 0.30$, where the achievable share falls from
+$94\%$ to $82\%$. The raw success rate remains the headline number, being what
+a deployed system would experience, but the OOD collapse of this axis is
+substantially structural and milder than the raw curve suggests.
+
+The step budget behaves as
 expected of a pure time constraint: success rises with $T$ ($49.0\%$ at $T=50$ to
-$89.8\%$ at $T=300$) with diminishing returns, since a generous budget only helps
-episodes that were close to succeeding anyway.
+$89.8\%$ at $T=300$, Figure~\ref{fig:app-maxsteps}) with diminishing returns,
+since a generous budget only helps episodes that were close to succeeding anyway.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\textwidth]{fig_density.png}
 \caption{Sensitivity to obstacle density $\rho$, the one axis that governs
-difficulty. Shaded points ($\rho > 0.30$) are the OOD extrapolation. Note that
+difficulty. Shaded points ($\rho = 0$ and $\rho > 0.30$) are the OOD
+extrapolation, the trained range being $[0.10, 0.30]$. Note that
 time-to-find, averaged over successful episodes only, is a survivorship
 statistic at those densities rather than a difficulty signal.}
 \label{fig:sweep-density}
@@ -254,7 +300,7 @@ statistic at those densities rather than a difficulty signal.}
 \paragraph{Learning curve.}
 Re-evaluating the periodic checkpoints at the reference operating point
 (Figure~\ref{fig:epoch}) shows success rising to a
-plateau around $80\text{--}85\%$ by roughly episode $25{,}000$ and holding, with
+plateau around $79\text{--}86\%$ by roughly episode $25{,}000$ and holding, with
 SPL continuing to inch up afterward: the policy keeps refining \emph{how} it
 reaches targets after the \emph{whether} has largely converged. The intermediate
 dip around episodes $17{,}500\text{--}22{,}500$ (success $68\text{--}70\%$) falls
@@ -262,10 +308,12 @@ in the stretch where exploration has long since floored, $\varepsilon$ hitting
 $0.05$ at episode $5{,}990$, while the learning rate is still
 $67\text{--}82\%$ of its peak on the cosine schedule: large updates against a
 nearly greedy, self-generated state distribution. It recovers without
-intervention as the annealing proceeds, and the greedy evaluation logged online
-during the run itself, which uses a different instance bank and was recorded
-independently of these re-evaluations, places its own local minima in the same
-stretch, at episodes $16{,}000$ and $21{,}000$. This curve is the greedy,
+intervention as the annealing proceeds. The near-greedy evaluation logged online
+during the run itself ($\varepsilon = 0.05$ on a different, $20$-episode bank)
+also dips in this region, at episodes $16{,}000$ and $21{,}000$, but that bank is
+far too small to corroborate the timing: at $20$ episodes a $0.55$ against $0.70$
+difference is well inside the sampling noise, and comparable dips appear
+elsewhere on the same curve. This curve is the greedy,
 $300$-seed complement to the online training scalars of
 Figure~\ref{fig:training-curves}.
 
@@ -361,8 +409,12 @@ episodes fault-free and $27\%$ losing the entire team. Panel~(b) conditions
 success on how many drones survived, and this is where the graceful-degradation
 claim becomes mechanical rather than rhetorical. A team that finishes intact
 succeeds $93.9\%$ of the time; losing one drone costs $14$ points ($79.8\%$), and
-even a lone survivor still finds the target in $52.6\%$ of episodes, roughly the
-single-drone baseline reached from a worse starting position. The $0\%$ bar at
+even a lone survivor still finds the target in $52.6\%$ of episodes. That last
+figure sits $18$ points below the $71.0\%$ of a team that was \emph{born} alone,
+which is the honest reading of the cost of attrition: a sole survivor is not
+equivalent to a solo searcher, having lost part of the budget to a team that no
+longer exists and inheriting a partially swept map from a worse position. It
+remains, however, a degradation of degree rather than of kind. The $0\%$ bar at
 zero survivors is definitional, not a policy failure: an all-dead team truncates
 the episode, so those $200$ episodes are lost to the environment rather than to
 the policy.
@@ -407,15 +459,15 @@ Figure~\ref{fig:sweep-comm} isolates it, and the result splits cleanly in two.
 Fusion is not what lets the team \emph{find} the target: success is $87.6\%$ with
 communication severed against $87\text{--}90\%$ over the whole range, a spread
 well inside the confidence intervals. It is what lets the team find it
-\emph{well}. Switching fusion on is worth close to a fifth of the team's
-efficiency on every measure the harness records. Between $\rcomm = 0$ and the
-trained maximum $\rcomm = 12$, SPL rises from $0.492$ to $0.587$ ($+19\%$),
+\emph{well}. Switching fusion on is worth between a seventh and a fifth of the
+team's efficiency on every measure the harness records. Between $\rcomm = 0$ and
+the trained maximum $\rcomm = 12$, SPL rises from $0.492$ to $0.587$ ($+19\%$),
 per-drone revisits fall from $9.9$ to $8.6$ ($-13\%$) and inter-drone overlap
 from $26.6\%$ to $21.0\%$ ($-21\%$), while mission time drops from $61.7$ rounds
 to $49.6$ at its best ($-20\%$). For a mechanism that costs nothing
 beyond being within range of a teammate, and that no reward term ever instructed
-the policy to exploit, a uniform fifth off the cost of a mission is a substantial
-return.
+the policy to exploit, taking something close to a fifth off the cost of a
+mission is a substantial return.
 
 The reading matters for the multi-agent analysis. Communication is not what
 \emph{creates} coordination here: with the channel cut the team still disperses
@@ -476,9 +528,10 @@ marginally. Team size $\times$ communication (left) shows success governed almos
 entirely by $\nagents$, with the $\rcomm$ direction nearly flat at every team
 size: the communication finding above, now visibly independent of team size.
 Vision $\times$ density (right) shows the reverse: density sets the achievable
-success band and vision helps appreciably only in open maps, where seeing farther
-translates into faster coverage, while in dense clutter the extra sight lines are
-wasted on walls. The two dominant factors of the whole study, how \emph{many}
+success band, and vision helps at low-to-moderate clutter, where seeing farther
+translates into faster coverage (the $\rvis = 1 \to 6$ gain peaks at
+$+15.7$ points at $\rho = 0.2$), while in dense clutter it is worth almost
+nothing, the extra sight lines being wasted on walls. The two dominant factors of the whole study, how \emph{many}
 drones and how \emph{cluttered} the world, are exactly the two that these
 interaction grids single out.
 
@@ -537,6 +590,15 @@ certifies how the opaque learned policy acts on a specific unseen instance, a ga
 Section~\ref{subsec:eth-responsibility} returns to. The OOD probes show graceful
 extrapolation on the axes tested but do not guarantee it in general, density
 already showing where extrapolation fails.
+
+\emph{The instances are not all solvable.} Reachability is guaranteed from the
+reference corner while the team spawns on a random one, so a density-dependent
+fraction of episodes has no solution to find. Every success rate here is
+therefore measured against a ceiling below $100\%$: the table above separates
+the two effects on the density axis, and the remaining sweeps, all run at
+$\rho = 0.2$, carry an unstated $8.6\%$ floor of impossible instances. Seeding
+reachability from the drawn corner would remove the mismatch, at the cost of
+making every number reported here incomparable with the new ones.
 
 \emph{Instrumentation gaps.} The belief-lag / fault$\times$comm interaction and
 two of the three emergence signatures were defined but not measured, for want of

@@ -59,11 +59,12 @@
 \begin{abstract}
 \noindent
 We study cooperative target search by a team of drones on a partially
-observable grid, under limited communication, a fixed time budget and,
-the defining extension of this work, the possibility that any drone
+observable grid, under limited communication, a fixed time budget and~--- the
+defining extension of this work~--- the possibility that any drone
 permanently breaks at any moment, with no central authority to announce the
 loss. A single Dueling Double DQN with parameter sharing drives every drone
-through one shared forward pass; per-episode domain randomization and a compact
+from strictly per-drone inputs, batched into one forward pass only for speed;
+per-episode domain randomization and a compact
 context vector turn that one policy into a generalist across team size,
 sensing, communication range, obstacle density, and fault rate. Fault
 knowledge is fully decentralized: a wreck emits only a passive distress
@@ -123,7 +124,11 @@ swarm as resilient as a rescue one.
 \appendix
 \input{sections/10_appendix}
 
+% The bibliography is set one size down: 62 entries at body size run to five
+% pages, and the course caps the report at 50.
+{\small
 \bibliographystyle{plainnat}
 \bibliography{references}
+}
 
 \end{document}

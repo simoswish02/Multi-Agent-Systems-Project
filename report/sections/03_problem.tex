@@ -23,7 +23,7 @@ $\mathcal{O} \subset \mathcal{G}$, $\rho$ & $\rho \in [0.10, 0.30]$ & obstacle c
 $\mathcal{F} = \mathcal{G}\setminus\mathcal{O}$ & --- & free (traversable) cells \\
 $g \in \mathcal{F}$ & --- & hidden target cell \\
 $\nagents$, $i$ & $\nagents \in \{1,\dots,4\}$ & team size and drone index $i \in \{1,\dots,\nagents\}$ \\
-$p_i^t \in \mathcal{F}$ & --- & position of drone $i$ at turn $t$ \\
+$p_i^t$ & --- & position of drone $i$ at turn $t$ \\
 $\mathcal{A}$ & $\{\mathrm{up},\mathrm{down},\mathrm{left},\mathrm{right}\}$ & action set (4 unit moves) \\
 $\rvis$ & $\rvis \in \{1,\dots,6\}$ & vision radius (Chebyshev) \\
 $V_i^t \subseteq \mathcal{G}$ & --- & vision set of drone $i$ at turn $t$ \\
@@ -51,12 +51,19 @@ fresh $\gridsize\times\gridsize$ occupancy grid is generated: each cell is
 independently declared an obstacle with probability $\rho$, and a single target
 cell $g$ is placed uniformly at random among the free cells that are reachable
 (under 4-connectivity) from the reference corner
-$(0,0)$.\footnote{Reachability is verified with a breadth-first search at
-generation time; layouts whose reachable region is empty are rejected and
-resampled. The guarantee is stated with respect to the reference corner from
-which the search is run.} A team of $\nagents$ drones spawns \emph{co-located}
-on one randomly chosen corner of the map. The target position is unknown to the
-drones; obstacles are likewise unknown until observed.
+$(0,0)$.\footnote{Reachability is verified with a breadth-first search from
+$(0,0)$ at generation time; layouts whose reachable region is empty are rejected
+and resampled. The guarantee therefore concerns $(0,0)$ alone, and $(0,0)$ is
+also the only corner forced free: since the team spawns on a uniformly chosen
+corner, the target is in fact unreachable from the actual spawn in $1.4\%$ of
+episodes at $\rho = 0.10$, $8.6\%$ at $\rho = 0.20$ and $69.6\%$ at
+$\rho = 0.40$. That is a property of the instance distribution, not of the
+policy; it imposes a density-dependent ceiling on the success rates of
+Section~\ref{sec:experiments}, quantified in
+Section~\ref{subsec:exp-generalization}.} A team of
+$\nagents$ drones spawns \emph{co-located} on one randomly chosen corner of the
+map. The target position is unknown to the drones;
+obstacles are likewise unknown until observed.
 
 Each drone occupies one cell and, on its turn, moves to one of the four
 axis-adjacent cells. Drones perceive only a local neighbourhood of their
@@ -137,7 +144,7 @@ sides, so the policy always has a legal choice.
 
 \paragraph{Episode end.}
 The episode \emph{terminates} (success) as soon as the acting drone's new
-position equals $g$. It is \emph{truncated} (failure) when $t$ exceeds
+position equals $g$. It is \emph{truncated} (failure) when $t$ reaches
 $T_{\max} = 200\cdot\nagents$, or early when all drones are broken, since no
 state change is possible anymore. Faults are likewise truncations of the broken
 drone's experience stream rather than terminal states; the learning consequences
@@ -161,9 +168,9 @@ $K_i^t = (\mathit{Vis}_i, \mathit{Obs}_i, \mathit{Tgt}_i, \tau_i,
 \mathit{Brk}_i, \mathcal{C}_i)$, a set of spatial maps over $\mathcal{G}$
 updated after every move: for every cell $c \in V_i^t$,
 \[
-\mathit{Obs}_i(c) \leftarrow 1 \;\; \text{if } c \in \mathcal{O}, \qquad
-\mathit{Tgt}_i(c) \leftarrow 1 \;\; \text{if } c = g, \qquad
-\mathit{Vis}_i(c) \leftarrow 1 \;\; \text{otherwise}.
+\mathit{Obs}_i(c) \leftarrow 1 \;\text{ if } c \in \mathcal{O}, \qquad
+\mathit{Vis}_i(c) \leftarrow 1 \;\text{ otherwise, and, in addition,} \qquad
+\mathit{Tgt}_i(c) \leftarrow 1 \;\text{ if } c = g.
 \]
 All three maps are monotone: knowledge is never forgotten, so a target spotted
 once stays marked after it leaves the field of view. The trajectory map
@@ -198,7 +205,7 @@ the members merge their knowledge by an element-wise maximum,
 together with the union of the crashed-teammate sets
 $\mathcal{C}_i \leftarrow \bigcup_{j \in S} \mathcal{C}_j$, for every
 $i \in S$. Merging over connected components makes communication
-\emph{transitive} within a round: if $A$ is in range of $B$ and $B$ of $C$, all
+\emph{transitive} at every fusion event: if $A$ is in range of $B$ and $B$ of $C$, all
 three end up with identical fused maps even if $A$ and $C$ are far apart, since
 intermediate drones act as relays.
 
@@ -210,6 +217,8 @@ after the drones part ways, being written into the receiver's own maps; and
 \emph{selective}, in that the trajectory map $\tau_i$ is excluded from fusion, so
 the revisit-avoidance signal remains individual. Wrecks neither transmit nor
 receive: a broken drone's maps freeze at fault time.
+Figure~\ref{fig:scenario} puts vision, communication and a wreck's beacon side
+by side on one miniature board.
 
 \subsection{Fault model}
 \label{subsec:prob-fault}

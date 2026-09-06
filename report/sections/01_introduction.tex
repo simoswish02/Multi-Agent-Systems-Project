@@ -15,7 +15,7 @@ into an expensive single searcher.
 
 This project adds to that already delicate setting the ingredient that real
 operations always contain and idealized models usually omit: \textbf{failure}.
-Small drones break; motors fail, batteries die, weather intervenes. And they
+Small drones break: motors fail, batteries die, weather intervenes. And they
 break \emph{mid-mission}, unpredictably, without ceremony. A search system that
 presumes a fixed team is brittle in exactly the situations that matter most.
 Worse, in a genuinely decentralized setting a drone's death is not even
@@ -30,7 +30,8 @@ as first-class design objects.
 Concretely, we study the following task, formalized in
 Section~\ref{sec:problem}. A team of $\nagents$ drones spawns co-located on a
 corner of a $\gridsize\times\gridsize$ occupancy grid scattered with obstacles;
-a single target, guaranteed reachable, is hidden at an unknown cell. Each drone
+a single target, drawn from the region reachable from the reference corner, is
+hidden at an unknown cell. Each drone
 sees only a window of radius $\rvis$ around itself, remembers what it has seen,
 and fuses its accumulated map with any teammate within communication range
 $\rcomm$. The team has a hard budget of $T_{\max}$ turns to physically reach the
@@ -43,13 +44,14 @@ team-level: \emph{some} drone reaches the target in time, or the episode fails.
 \paragraph{The approach.}
 We solve the task with cooperative deep reinforcement learning under parameter
 sharing \citep{gupta2017cooperative}: a single Dueling Double DQN
-\citep{mnih2015human,vanhasselt2016double,wang2016dueling} drives every drone,
-consuming that drone's private maps through a convolutional architecture with an
-attention bottleneck, and trained on the pooled experience of the whole team.
+\citep{mnih2015human,vanhasselt2016double,wang2016dueling} drives every drone:
+it consumes that drone's private maps through a convolutional architecture with
+an attention bottleneck, and is trained on the pooled experience of the whole
+team.
 Rather than fixing one operating condition, every training episode randomizes the
 regime \citep{tobin2017domain}, sampling the vision radius, the communication
 range, the team size, the obstacle density and the fault probability. The sampled
-parameters that a real drone could plausibly know are fed back to the network as
+parameters that a real drone could plausibly know are fed to the network as
 a context vector,
 together with two per-drone quantities: an identity, which breaks the symmetry of
 parameter sharing and lets co-located drones adopt different roles from the first
@@ -72,7 +74,8 @@ first-class abstraction that mediates and governs all interaction; the map fusio
 is read as knowledge-level, protocol-free communication over a distributed shared
 dataspace; the visited-cell traces as a virtualized form of stigmergy; the fused
 map, the beacon and the action mask as coordination artefacts; the team's
-dispersion and post-fault re-covering as emergent, self-organized structure that
+dispersion and post-fault \emph{re-covering} (survivors sweeping a lost
+teammate's sector again) as emergent, self-organized structure that
 no component specifies; and the whole design is placed on the autonomy spectrum
 as operationally autonomous but motivationally not. This analysis is not
 decorative: it is what connects a concrete learned system to the questions about
@@ -100,7 +103,7 @@ The report makes the following contributions:
   \item \emph{A systematic multi-agent reading of the system}
     (Section~\ref{sec:mas}): a detailed mapping between the implemented
     mechanisms and the paradigm's core concepts, namely agenthood, environment,
-    coordination, artefacts, self-organisation, openness, autonomy and
+    coordination, artefacts, self-organization, openness, autonomy and
     multi-agent learning.
   \item \emph{An empirical demonstration of generalization and graceful
     degradation} (Section~\ref{sec:experiments}): a seeded,

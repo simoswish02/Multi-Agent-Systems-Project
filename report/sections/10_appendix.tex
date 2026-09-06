@@ -17,7 +17,7 @@ Table~\ref{tab:reward}.
 \toprule
 \textbf{Parameter} & \textbf{Value} & \textbf{Notes} \\
 \midrule
-Grid size            & $\gridsize\times\gridsize$ & fixed; never randomized (Invariant~1) \\
+Grid size            & $\gridsize\times\gridsize$ & fixed; never randomized \\
 Action space         & $4$ (up/down/left/right)   & no ``stay'' action; masked at grid/obstacle edges \\
 Vision metric        & Chebyshev                  & $(2\rvis{+}1)^2$ square window \\
 Comm.\ metric        & Manhattan                  & range-limited pairwise map fusion \\
@@ -88,7 +88,7 @@ Replay buffer             & $2\times10^5$  & uniform; not serialized in checkpoi
 Batch size                & $16$           & --- \\
 Update cadence            & every $4$ agent-turns & one gradient step \\
 Target sync               & every $500$ gradient steps & hard copy \\
-$\varepsilon$ schedule    & $1.0\!\to\!0.05$, $\times0.9995$/episode & floor at $\approx$ ep.\ $6{,}000$ \\
+$\varepsilon$ schedule    & $1.0\!\to\!0.05$, $\times0.9995$/episode & floor at ep.\ $5{,}990$ \\
 FC head widths            & $1536\!\to\!768\!\to\!384$ & dueling head $Q=V+A-\overline{A}$ \\
 \bottomrule
 \end{tabular}
@@ -133,19 +133,37 @@ The code is organized as a small set of packages behind three entry points.
     \texttt{step\_agent}, reward, beacon detection, communication fusion) and
     \texttt{utils.py} (BFS helpers and the eval-only \texttt{auto\_nav\_action}).
   \item \texttt{agents/}: \texttt{networks.py} (GlobalMapCNN, LocalCNN,
-    dueling head) and \texttt{dqn\_agent.py} (Double-DQN agent: action
-    selection, learning step, checkpoint I/O).
+    dueling head), \texttt{dqn\_agent.py} (Double-DQN agent: action
+    selection, learning step, checkpoint I/O), \texttt{nstep.py} (per-drone
+    $n$-step windows), \texttt{replay\_buffer.py}, \texttt{scheduler\_utils.py}
+    (warmup + cosine LR) and \texttt{base\_agent.py}.
   \item \texttt{training/}: \texttt{train.py} (curriculum loop, domain
     randomization, $n$-step windows, in-training evaluation).
   \item \texttt{gui/}: the renderer for the \texttt{play}, \texttt{eval}
     and \texttt{simulate} modes (fault slider, auto-nav toggle).
   \item \texttt{testing/}: \texttt{evaluate\_\allowbreak policy.py}, the OFAT,
-    fault, heatmap and epoch harness, and \texttt{analysis.\allowbreak ipynb}
-    for figure generation.
+    fault, heatmap and epoch harness, \texttt{analysis.\allowbreak ipynb}
+    (every figure of Section~\ref{sec:experiments}) and
+    \texttt{make\_\allowbreak training\_\allowbreak figures.py} (the telemetry
+    and schedule figures of Section~\ref{sec:training}).
+  \item \texttt{demo/}: the code that renders the narrated video walkthrough
+    end to end from the trained policy and the experiment CSVs; \texttt{hpc/}:
+    the SLURM batch scripts that produced the results.
   \item Top level: \texttt{main.py} (all runtime modes),
     \texttt{eval\_checkpoints.py} (batch and \texttt{--watch} checkpoint
     ranking), and \texttt{configs/default.yaml} (single source of truth).
 \end{itemize}
+
+\paragraph{Trained weights.}
+Every number in Section~\ref{sec:experiments} comes from the final checkpoint of
+the $50{,}000$-episode run,
+\texttt{mas\_\allowbreak 50k\_\allowbreak dr\_\allowbreak faults\_\allowbreak ep50000.pt}.
+It is too large for the repository and is published separately:
+\begin{center}\footnotesize\urlstyle{same}
+HUGGINGFACE-URL-PLACEHOLDER
+\end{center}
+Place it under \texttt{checkpoints/} and pass it to \texttt{--checkpoint};
+the \texttt{q\_net} entry of the saved dictionary holds the network weights.
 
 \paragraph{Environment setup.}
 \begin{verbatim}
@@ -177,8 +195,8 @@ python testing/evaluate_policy.py --axis epoch    --seeds 300
 \section{Additional Figures}
 \label{app:figures}
 
-For completeness this appendix collects the two figures referenced from the body
-but not shown there. Figure~\ref{fig:app-maxsteps} gives the step-budget sweep
+For completeness this appendix collects two figures that complement the body.
+Figure~\ref{fig:app-maxsteps} gives the step-budget sweep
 summarized in Table~\ref{tab:generalization}, with the six panels following the
 layout of Figures~\ref{fig:sweep-nagents} and~\ref{fig:sweep-density}, and
 Figure~\ref{fig:schedules} documents the two per-episode schedules of the
@@ -189,8 +207,10 @@ training run of Section~\ref{sec:training}.
 \includegraphics[width=\textwidth]{fig_max_steps.png}
 \caption{Sensitivity to the step budget $T$. Success rises with diminishing
 returns as the budget grows; a larger budget only rescues episodes that were
-already close to succeeding. No OOD region is defined for this axis (the
-budget is not a randomized factor).}
+already close to succeeding. The budget was never randomized, training having
+fixed $T = 200$: the dashed line marks that single trained value, and every
+other point is an extrapolation, so the white/shaded convention of
+Section~\ref{sec:experiments} does not apply on this axis.}
 \label{fig:app-maxsteps}
 \end{figure}
 

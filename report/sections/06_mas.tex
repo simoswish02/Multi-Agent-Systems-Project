@@ -9,7 +9,7 @@ and of locating where a system's intelligence actually resides
 \citep{jennings2001agent,wooldridge2009introduction}. Read through that lens the
 drone team instantiates a remarkably wide slice of the multi-agent conceptual
 apparatus, from agenthood and the environment-as-abstraction through
-coordination, artefacts, self-organisation, resilience and graduated autonomy to
+coordination, artefacts, self-organization, resilience and graduated autonomy to
 multi-agent learning. Throughout, every conceptual claim is anchored to a
 concrete mechanism from Sections~\ref{sec:problem}--\ref{sec:training}, and the
 section closes by asking, honestly, what a richer multi-agent design would add
@@ -156,8 +156,10 @@ scaffolding around the agents but a design dimension in its own right: an active
 entity with its own state, dynamics and rules, through which agents perceive, act
 and interact \citep{weyns2007environment}. This project embodies that stance
 structurally: \texttt{DroneSearchEnv} is not a thin arena but the locus of most of
-the system's semantics, and the agents are, by line count and by conceptual
-weight, the \emph{smaller} half of the design. Four environmental
+the system's semantics. The agent package is larger in absolute size, but almost
+all of it is network definition and learning machinery; the world model,
+including every rule of interaction, lives entirely on the environment side.
+Four environmental
 responsibilities deserve explicit notice. \emph{Topology and locality}: the grid,
 its Chebyshev vision neighbourhoods and its Manhattan communication distances
 define what ``near'' means, and thereby delimit perception, interaction and
@@ -178,8 +180,8 @@ without ever being commanded.
 The methodological payoff appeared already in Section~\ref{sec:architecture}:
 because the environment owns the rules, the agents could be swapped (random,
 keyboard-driven, BFS-guided, learned) with zero change to the world's semantics,
-which is exactly what Section~\ref{sec:experiments} exploits to compare the
-learned policy against baselines on identical instances.
+which is what lets Section~\ref{sec:experiments} run the learned policy and the
+BFS auto-navigation override over identical seeded instances.
 
 \subsection{Interaction and coordination}
 \label{subsec:mas-coordination}
@@ -296,10 +298,10 @@ observation artefacts through which the \emph{engineer} perceives the MAS, the
 instrumentation layer that makes an otherwise opaque adaptive system engineerable
 at all.
 
-\subsection{Self-organisation and emergence}
+\subsection{Self-organization and emergence}
 \label{subsec:mas-emergence}
 
-Self-organisation denotes the acquisition of structure by a system through
+Self-organization denotes the acquisition of structure by a system through
 internal, distributed processes, without external control
 \citep{ashby1962principles,camazine2001self}; emergence denotes the appearance of
 coherent macro-level patterns not reducible to, nor explicitly encoded in, the
@@ -330,10 +332,10 @@ target's location enters the shared map and propagates through fusion, collapsin
 the team's search into a pursuit. The balance of the two is exactly what the
 policy has had to learn.
 
-Two honest qualifications distinguish this from natural self-organisation. First,
-the organisation is \emph{trained into} the system: the attractors of the
+Two honest qualifications distinguish this from natural self-organization. First,
+the organization is \emph{trained into} the system: the attractors of the
 collective dynamics were shaped by fifty thousand episodes of gradient descent
-against a designer-chosen reward, which is self-organisation at execution time
+against a designer-chosen reward, which is self-organization at execution time
 and teleology at training time. Second, these team-level regularities have the
 status of \emph{design intent with partial quantitative support}: of the three
 signatures defined as their empirical test,
@@ -454,7 +456,7 @@ observations or actions, and no global state anywhere in the loss. Every
 transition that trains the network is something some individual drone actually
 experienced, and execution is correspondingly clean, since the batched action
 selection is a wall-clock optimization with no informational content. The
-deployment artifact is a fully decentralized policy in the strictest sense. The
+deployment artefact is a fully decentralized policy in the strictest sense. The
 same choice disposes of two MARL classics at once: the \emph{symmetry} of a
 shared policy at a shared spawn is broken by the identity entry of the context
 vector, and \emph{scalability} follows from never materializing the joint
@@ -468,7 +470,7 @@ MARL: that co-evolution of one policy converges more gracefully than co-evolutio
 of $\nagents$.
 
 \paragraph{The platform as a multi-agent laboratory.}
-A final identity shift is worth recording: the same artifact that trains the
+A final identity shift is worth recording: the same artefact that trains the
 policy is, unchanged, an agent-based simulation platform
 \citep{bonabeau2002agent}, a micro-level model whose macro-behaviour is studied
 by controlled manipulation. The seeded, parameterized evaluation harness is
@@ -503,7 +505,7 @@ Section~\ref{subsec:eth-responsibility} makes precise. The cost is the classical
 one: hand-authored plan libraries in a domain whose main difficulty is exactly
 what resists concise symbolic specification.
 
-\emph{Organisational structure}, meaning roles, formations and an explicit
+\emph{Organizational structure}, meaning roles, formations and an explicit
 division of the map, would replace learned conventions with designed ones,
 gaining predictability and losing the seamless re-adaptation that makes the fault
 response work: a role structure must be re-formed when its occupants die, whereas

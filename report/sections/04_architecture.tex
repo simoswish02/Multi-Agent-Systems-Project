@@ -115,7 +115,7 @@ coin flip (on a break, the rest of the pipeline is skipped and the call returns 
 flagged no-op, the turn having been spent all the same); (ii)~move validation and
 execution, accumulating the reward terms of Table~\ref{tab:reward};
 (iii)~vision update of the drone's knowledge maps; (iv)~wreck-beacon detection;
-(v)~communication fusion over the connectivity components; (vi)~update of the
+(v)~communication fusion over the connected components; (vi)~update of the
 team-level discovered set, from which the exploration bonus is computed;
 (vii)~target check. A wreck's call skips everything but the clock. The action
 mask is computed on demand per drone and returned alongside the observation, so
@@ -141,7 +141,7 @@ The knowledge state $K_i^t$ reaches the network as two spatial tensors
 3 & Target         & both   & $\{0,1\}$: target cell once seen (persistent memory) \\
 4 & Own\_Position  & global & $\{0,1\}$: single $1$ at drone $i$'s cell \\
 5 & Broken         & global & $\{0,1\}$: crash sites \emph{known to drone $i$} \\
-4 & Other\_Position& local  & $\{0,1\}$: \emph{live} teammates currently within $V_i^t$ \\
+4 & Other\_Position & local & $\{0,1\}$: \emph{live} teammates currently within $V_i^t$ \\
 \bottomrule
 \end{tabular}
 \caption{Observation channels. The \emph{global} stream
@@ -165,7 +165,7 @@ too}: the Broken channel marks the crash sites drone $i$ knows about, and only
 those. Beyond the scalar belief $\hat n_i$, the \emph{location} of a crash tells
 the network \emph{which region} lost its searcher, precisely what is needed to
 re-cover a dead teammate's sector. The local stream then complements the global
-one at a different scale: its $13\times13$ crop, sized to exceed the largest
+one at a different scale: its $13\times13$ crop, sized to match the largest
 vision window ($2\cdot6+1 = 13$), retains full resolution where cell-level
 distinctions drive immediate action.
 
@@ -336,8 +336,8 @@ stream of the whole team. Per-drone windows are necessary because execution is
 sequential: drone $i$'s ``next step'' is one round away, interleaved with every
 other drone's turns, so windows must be threaded by agent rather than by
 wall-clock order. Each emitted transition carries the pair
-$(R^{(m)}, \gamma^m)$, the discounted $m$-step return and the bootstrap discount,
-with $\gamma^m$ replaced by $0$ if the window hit a terminal state; so
+$(R^{(n)}, \gamma^n)$, the discounted $n$-step return and the bootstrap discount,
+with $\gamma^n$ replaced by $0$ if the window hit a terminal state; so
 termination-vs-truncation semantics are decided \emph{once}, at emission time,
 and the update rule stays oblivious to them. The window also implements the two
 fault-sensitive behaviours motivated in Section~\ref{subsec:train-correctness}:
@@ -362,14 +362,20 @@ row before the $\arg\max$ (masked actions set to $-\infty$; exploring drones
 sample uniformly among their legal actions). This is an implementation
 convenience enabled by parameter sharing: the \emph{information} used for each
 drone's decision remains strictly its own observation and context, preserving
-decentralized-execution semantics.
+decentralized-execution semantics. One consequence is worth stating: since the
+batch is formed at the round boundary and then applied turn by turn, a drone
+acts on its observation as of its \emph{previous} turn, so it does not see the
+cells a teammate uncovered earlier in the same round. The staleness is bounded
+by one round and never crosses drone boundaries; it is, if anything, a
+conservative model of a real team, whose members would not have instantaneous
+access to each other's latest percept either.
 
 \subsection{Tooling and interaction modes}
 \label{subsec:arch-tooling}
 
 Beyond training, the same environment and agent serve three interactive
 workflows: an \emph{eval} mode that renders greedy policy episodes; a
-\emph{play} mode that hands drone 0 to the keyboard, valuable for
+\emph{play} mode that hands the first drone to the keyboard, valuable for
 sanity-checking reward mechanics and fault behaviour from the inside; and a
 \emph{simulate} mode with a configuration screen (team size, vision,
 communication, density, and a fault-probability slider) that runs batches of
