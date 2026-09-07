@@ -77,9 +77,10 @@ epistemic account of fault handling, and we evaluate it empirically. The
 single policy generalizes across every randomization axis, including
 \emph{beyond} its trained ranges on team size, vision and communication; most
 importantly, it degrades \emph{gracefully} under faults: across the
-entire trained fault range success drops by under six points while the team
-loses, on average, more than half a drone, and even at more than triple the
-trained fault rate it still completes two missions in three, with no cliff. We
+entire trained fault range success drops by under seven points while the team
+loses, on average, close to half a drone, and even at more than triple the
+trained fault rate it still completes nearly three missions in four, with no
+cliff. We
 close with an ethical and regulatory analysis (GDPR, the EU AI Act and its
 military carve-out, and the autonomous-weapons scenario) that takes seriously
 the dual-use nature of a capability whose fault tolerance would make an attack
@@ -125,9 +126,11 @@ swarm as resilient as a rescue one.
 \appendix
 \input{sections/10_appendix}
 
-% The bibliography is set one size down: 62 entries at body size run to five
-% pages, and the course caps the report at 50.
+% The bibliography is set one size down and on a tightened inter-entry skip:
+% 62 entries at body size and natbib's default \bibsep run to five pages, and
+% the course caps the report at 50.
 {\small
+\setlength{\bibsep}{0.15ex plus 0.1ex}
 \bibliographystyle{plainnat}
 \bibliography{references}
 }

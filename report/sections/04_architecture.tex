@@ -101,13 +101,17 @@ what the environment \emph{does} and what the network is \emph{told} can never
 diverge.
 
 \paragraph{World generation.}
-\texttt{reset()} performs rejection sampling: it draws an obstacle map with
-density $\rho$, forces the reference corner free, computes the BFS-reachable
-region, and resamples (up to a bounded number of attempts) if that region is
-trivial; the target is then drawn uniformly from the reachable free cells. All
-randomness flows through a single seeded generator, and map generation consumes
-it before the fault process does, so one seed reproduces the layout \emph{and}
-the fault sequence, a property the evaluation protocol relies on.
+\texttt{reset()} draws the spawn corner first, then performs rejection sampling
+around it: it draws an obstacle map with density $\rho$, forces the spawn cell
+free, computes the BFS-reachable region from that cell, and resamples (up to a
+bounded number of attempts) if that region is trivial; the target is then drawn
+uniformly from the reachable free cells. The order matters, the reachability
+guarantee holding only for the cell the generator is given, so drawing the
+corner afterwards would silently produce unsolvable instances. All
+randomness flows through a single seeded generator, and corner and map
+generation consume it before the fault process does, so one seed reproduces the
+layout \emph{and} the fault sequence, a property the evaluation protocol relies
+on.
 
 \paragraph{Anatomy of a turn.}
 A live drone's \texttt{step\_agent} call executes a fixed pipeline: (i)~the fault

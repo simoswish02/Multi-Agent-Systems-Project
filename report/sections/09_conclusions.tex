@@ -35,19 +35,20 @@ true state of the team.
 The evaluation (Section~\ref{sec:experiments}) substantiated the central claims
 and bounded them honestly. A single policy generalized across every randomization
 axis, including \emph{beyond} its trained ranges on team size, vision and
-communication, driving teams of six drones it never trained on at over $90\%$
+communication, driving teams of six drones it never trained on at $99\%$
 success. Most importantly, degradation under faults is \emph{graceful}: across
-the entire trained fault range success fell by under six points while the team
-shed, on average, more than half a drone, and even at a fault rate more than
-triple the trained maximum the system still completed two missions in three, with
-no cliff. The sweeps also separated two competences the success rate conflates:
-vision governs both whether and how well the team searches, while communication
-governs only how well, though it governs it substantially, map fusion buying
-close to a fifth in path quality and mission time, and a seventh in redundancy,
+the entire trained fault range success fell by under seven points while the team
+shed, on average, close to half a drone, and even at a fault rate more than
+triple the trained maximum the system still completed nearly three missions in
+four, with no cliff. The sweeps also separated two competences the success rate
+conflates: vision governs both whether and how well the team searches, while
+communication governs only how well, though it governs it substantially, map
+fusion buying a fifth in mission time and close to a third in redundancy,
 at no cost beyond proximity. The limits were equally clear: obstacle density is
-the one axis whose extrapolation collapses, although a breadth-first check of
-the evaluation instances showed most of that collapse to be the instance
-distribution becoming unsolvable rather than the policy failing; and two of the
+the one axis that genuinely governs difficulty, costing fifteen points across
+its trained range alone, and above that range it stops being measurable on the
+same scale, the free space fragmenting until the mission is confined to the
+spawn's own pocket; and two of the
 three emergence signatures, together with the belief-lag question, remain
 defined but uninstrumented.
 Section~\ref{sec:ethics} then argued that the capability is irreducibly
@@ -72,7 +73,12 @@ would deliver the two emergence signatures (inter-drone distance over time,
 post-fault re-covering latency) that Section~\ref{subsec:exp-qualitative} left
 qualitative; two further ablations, removing the believed-alive count from the
 context vector and switching the shared terminal reward for an individual one,
-require retraining a policy each. None of these changes the architecture: they
+require retraining a policy each. A third run belongs on the same list: the
+evaluated weights were trained before the instance generator was corrected, on a
+distribution in which roughly one episode in eight was unsolvable
+(Section~\ref{subsec:exp-setup}), and retraining on the corrected generator would
+close the only mismatch left between the training and evaluation conditions.
+None of these changes the architecture: they
 are instrumentation and compute, and they would sharpen the claims already made.
 
 Three directions reach further. On coordination, the finding that communication

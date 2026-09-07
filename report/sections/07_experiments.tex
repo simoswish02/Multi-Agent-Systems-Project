@@ -57,7 +57,10 @@ which it would otherwise be incomparable. \emph{Coverage} is the fraction of fre
 cells the team has discovered at episode end; \emph{overlap} is the fraction of
 team-visited cells visited by more than one drone, and \emph{revisits} the mean
 per-drone re-entries, the two redundancy signatures promised in
-Section~\ref{subsec:mas-emergence}. \emph{SPL} (Success weighted by Path Length)
+Section~\ref{subsec:mas-emergence}. Its denominator is every free cell, including
+those the team could not enter even in principle, a distinction that is
+immaterial in open maps and decisive in dense ones, as
+Section~\ref{subsec:exp-generalization} shows. \emph{SPL} (Success weighted by Path Length)
 \citep{anderson2018evaluation} weights each success by the ratio of the
 optimal spawn-to-target distance to the finder's actual path length, rewarding
 \emph{short} solutions and scoring failures zero; it is our single scalar for
@@ -72,10 +75,30 @@ found. This is precisely the shaping-versus-task discrepancy that motivated the
 success-dominant checkpoint rule of Section~\ref{subsec:train-correctness}; we
 therefore read success rate, not return, as the primary metric throughout.
 
-At the reference operating point the policy reaches the target in $87.6\%$ of
-episodes (Wilson CI $[84.4, 90.2]$), discovering $53.7\%$ of the free space with
-an SPL of $0.541$: the anchor every one-factor sweep below passes through. The
-learning curve of Figure~\ref{fig:epoch} ends slightly lower, at $85.0\%$, for
+\paragraph{The instance distribution.}
+Every instance evaluated here is solvable by construction: the spawn corner is
+drawn \emph{first} and the layout generated around it, so the target always comes
+from the free cells $4$-connected to the cell the team actually occupies
+(Section~\ref{subsec:prob-scenario}), and a breadth-first check confirms it over
+the whole bank, no instance across the eight densities and $500$ seeds having an
+unreachable target or an obstructed spawn. This was \emph{not}
+true of the generator the evaluated weights were trained with, which anchored the
+guarantee to $(0,0)$ while the team spawned on a uniformly drawn corner: under
+the training randomization $\rho \sim \mathcal{U}[0.10, 0.30]$, some $12\%$ of
+training episodes had no solution to find, rising from $2.5\%$ at
+$\rho \approx 0.10$ to $25\%$ at $\rho \approx 0.30$, and $15\%$ started the team
+on an obstacle cell. The generator was corrected after training and the
+evaluation re-run on it. The mismatch cut both ways and is worth stating
+plainly: it cost the training run, roughly one episode in eight teaching the
+policy from a task it could not complete, and it makes the evaluation below
+simply correct rather than generous, every success rate here being measured
+against a ceiling of $100\%$. Retraining on the corrected generator is the
+obvious next run, and not one this report claims to have made.
+
+At the reference operating point the policy reaches the target in $97.6\%$ of
+episodes (Wilson CI $[95.9, 98.6]$), discovering $53.4\%$ of the free space with
+an SPL of $0.715$: the anchor every one-factor sweep below passes through. The
+learning curve of Figure~\ref{fig:epoch} ends fractionally lower, at $97.3\%$, for
 the same checkpoint at the same operating point; the two reconcile exactly, that
 curve being computed on the $300$-seed prefix ($2000$--$2299$) of this $500$-seed
 bank. One
@@ -125,24 +148,26 @@ and auto-nav references are the informative comparisons.
 \textbf{OOD probe} & \textbf{Success [\%]} \\
  & \textbf{sweep} & \textbf{(in-dist.)} & & \textbf{(OOD)} \\
 \midrule
-Team size $\nagents$      & $1 \to 4$        & $71.0 \to 89.2$ & $5,\,6$          & $89.6,\,90.4$ \\
-Vision $\rvis$            & $1 \to 6$        & $70.6 \to 87.2$ & $7,\,8$          & $87.0,\,85.6$ \\
-Comm.\ $\rcomm$           & $2 \to 12$       & $87.4 \to 89.0$ & $0,\,14,\,16$    & $87.6,\,88.0,\,89.6$ \\
-Density $\rho$            & $0.30 \to 0.10$  & $53.4 \to 96.2$ & $0,\,0.35,\,0.40$ & $99.0,\,34.6,\,24.2$ \\
-Budget $T$\,$^\dagger$    & $50 \to 300$     & $49.0 \to 89.8$ & ---              & --- \\
+Team size $\nagents$      & $1 \to 4$        & $79.0 \to 97.6$ & $5,\,6$          & $98.8,\,99.0$ \\
+Vision $\rvis$            & $1 \to 6$        & $80.2 \to 96.6$ & $7,\,8$          & $96.4,\,95.6$ \\
+Comm.\ $\rcomm$           & $2 \to 12$       & $96.8 \to 98.0$ & $0,\,14,\,16$    & $95.6,\,98.2,\,98.8$ \\
+Density $\rho$            & $0.30 \to 0.10$  & $83.6 \to 99.0$ & $0,\,0.35,\,0.40$ & $99.2,\,80.0,\,86.0$ \\
+Budget $T$\,$^\dagger$    & $50 \to 300$     & $55.4 \to 98.8$ & ---              & --- \\
 \bottomrule
 \end{tabular}
 \caption{Generalization summary (greedy policy, $500$ seeds per point).
 Each row sweeps one factor with the others held at the reference operating
 point. ``Success (in-dist.)'' reports the endpoints of the in-distribution
 sweep in the stated direction; the OOD probes extrapolate beyond the
-training range on either side. Team size, vision and communication all
-extrapolate without a cliff, including beyond their trained maxima; obstacle
-density is the one axis that governs difficulty, and the only one whose OOD
-extrapolation collapses, though a large part of that collapse is the instance
-distribution rather than the policy (Section~\ref{subsec:exp-generalization}).
-The obstacle-free case $\rho = 0$ lies below the trained floor of $0.10$ and is
-a benign extrapolation at $99.0\%$.
+training range on either side. No axis shows a cliff, in or out of
+distribution, including beyond the trained maxima of team size, vision and
+communication. Obstacle density remains the one factor that governs
+difficulty, costing $15$ points across its trained range alone; its two
+high-density probes are not comparable with the rest, the free space there
+fragmenting into disconnected pockets that make the mission structurally
+shorter (Section~\ref{subsec:exp-generalization}). The obstacle-free case
+$\rho = 0$ lies below the trained floor of $0.10$ and is a benign
+extrapolation at $99.2\%$.
 $^\dagger$~The step budget was never randomized (training fixed $T = 200$), so
 this row is an operating-condition sweep rather than an in/out-of-distribution
 one and admits no OOD probe.}
@@ -153,41 +178,48 @@ Table~\ref{tab:generalization} summarizes all five OFAT axes; we read them in
 three groups.
 
 \paragraph{Team size: cooperation helps, and extrapolates.}
-Adding drones raises success monotonically, from $71.0\%$ for a lone searcher to
-$89.2\%$ at $\nagents = 4$ (Figure~\ref{fig:sweep-nagents}), and, the result
+Adding drones raises success monotonically, from $79.0\%$ for a lone searcher to
+$97.6\%$ at $\nagents = 4$ (Figure~\ref{fig:sweep-nagents}), and, the result
 worth stressing, the curve does not break when the team grows \emph{past} any
-size seen in training: $\nagents = 5$ and $6$ reach $89.6\%$ and $90.4\%$. A
+size seen in training: $\nagents = 5$ and $6$ reach $98.8\%$ and $99.0\%$. A
 single shared network, conditioned only on the scalar team size and a per-drone
 identity, thus drives teams larger than it ever trained on without retraining or
 architectural change, which is the concrete pay-off of parameter sharing plus
-context conditioning argued in Section~\ref{subsec:mas-learning}. SPL climbs
-alongside success ($0.33 \to 0.58$ over $1\!\to\!4$, continuing to $0.64$ at
-$\nagents = 6$): more searchers means the target is typically found by whichever
-drone is already nearest, shortening the winning path.
+context conditioning argued in Section~\ref{subsec:mas-learning}. Almost the
+whole gain is bought by the first two teammates, success reaching $97.6\%$
+already at $\nagents = 3$ and saturating there; past that point the find rate has
+no room left, and what a larger team keeps buying is speed and path quality. SPL
+climbs alongside and does not saturate ($0.45 \to 0.75$ over $1\!\to\!4$,
+continuing to $0.81$ at $\nagents = 6$): more searchers means the target is
+typically found by whichever drone is already nearest, shortening the winning
+path.
 
 Larger teams are also genuinely \emph{faster}, and not merely more likely to
-succeed. Mission time falls from $84.9$ rounds for a lone searcher to $55.5$ at
-$\nagents = 3$ and $50.4$ at $\nagents = 4$, continuing to $42.7$ at
-$\nagents = 6$. The speed-up is real but markedly sublinear: $1.53\times$ at
-$\nagents = 3$ and $1.99\times$ at $\nagents = 6$, a parallel efficiency falling
-from $51\%$ to $33\%$. Doubling the team from three drones to six therefore cuts
-mission time by a further $23\%$ rather than halving it again, which is the
+succeed. Mission time falls from $78.3$ rounds for a lone searcher to $53.9$ at
+$\nagents = 3$ and $47.8$ at $\nagents = 4$, continuing to $42.4$ at
+$\nagents = 6$. The speed-up is real but markedly sublinear: $1.45\times$ at
+$\nagents = 3$ and $1.85\times$ at $\nagents = 6$, a parallel efficiency falling
+from $48\%$ to $31\%$. Doubling the team from three drones to six therefore cuts
+mission time by a further $21\%$ rather than halving it again, which is the
 quantitative form of the coordination overhead the next paragraph makes
 concrete.
 
 Two costs temper the picture, both visible in Figure~\ref{fig:sweep-nagents}.
-Mean return \emph{falls} as the team grows, since more drones each pay the step
-penalty, which is why return is not our ranking metric. And same-cell collisions
-rise steeply with $\nagents$, an unavoidable consequence of a shared spawn corner
+Mean return peaks at $\nagents = 2$ and \emph{falls} thereafter, down to $108.6$
+at $\nagents = 6$, since more drones each pay the step penalty, which is why
+return is not our ranking metric. And same-cell collisions rise steeply with
+$\nagents$, from $1.5$ per episode at $\nagents = 2$ to $35.9$ at $\nagents = 6$,
+an unavoidable consequence of a shared spawn corner
 and a bounded map, where more bodies contend for the same early cells. Congestion
 is precisely the mechanism behind the diminishing returns reported above: an
 added searcher spends an increasing share of the episode contending for, and
 re-sweeping, ground the team already holds. The two redundancy statistics
 separate the individual from the collective view of this: per-drone revisits fall
-and then flatten, each drone individually more efficient, while team overlap
-rises ($18.5\% \to 37.0\%$ from $\nagents = 2$ to $6$), the team collectively
+and then flatten ($6.7 \to 3.3$, flat from $\nagents = 4$ on), each drone
+individually more efficient, while team overlap
+rises ($13.9\% \to 33.8\%$ from $\nagents = 2$ to $6$), the team collectively
 more wasteful. Coverage confirms the ceiling: it plateaus at
-$53.7\text{--}55.2\%$ from $\nagents = 3$ on, so beyond that point extra drones
+$53.4\text{--}56.1\%$ from $\nagents = 3$ on, so beyond that point extra drones
 mostly duplicate each other's ground rather than extend the swept region.
 
 \begin{figure}[t]
@@ -205,21 +237,23 @@ Neither sensing axis has a cliff, in or out of distribution
 (Table~\ref{tab:generalization}), but the two are robust in quite different ways.
 Vision genuinely helps, and on every quality metric at once
 (Figure~\ref{fig:sweep-vision}): from $\rvis = 1$ to $\rvis = 6$ coverage rises
-from $46.5\%$ to $62.9\%$ (reaching $69.5\%$ at the OOD radius $\rvis = 8$), SPL
-nearly doubles ($0.33 \to 0.63$), and mission time falls from $81.5$ rounds to
-$43.0$, close to a halving. What saturates is the \emph{find rate}: success
-climbs steeply out of myopia ($70.6\%$ at $\rvis = 1$ to $87.6\%$ at
-$\rvis = 3$), peaks at $88.2\%$ around $\rvis = 4$, then drifts gently down in
-and out of distribution alike, because past that point the bottleneck is deciding
-\emph{where} to go rather than seeing farther. A wider window therefore keeps
-buying speed and path quality long after it has stopped buying missions.
+from $46.6\%$ to $64.2\%$ (reaching $71.6\%$ at the OOD radius $\rvis = 8$), SPL
+nearly doubles ($0.43 \to 0.81$), and mission time falls from $80.3$ rounds to
+$41.2$, close to a halving. What saturates is the \emph{find rate}: success
+climbs steeply out of myopia ($80.2\%$ at $\rvis = 1$ to $97.6\%$ at
+$\rvis = 3$, its peak), then settles at $96.6\text{--}96.8\%$ and drifts gently
+down in and out of distribution alike, because past that point the bottleneck is
+deciding \emph{where} to go rather than seeing farther. A wider window therefore
+keeps buying speed and path quality long after it has stopped buying missions.
 
-Communication is the more interesting axis, because there the success curve
-really is flat: $87\text{--}90\%$ across the entire range, and severing fusion
-outright ($\rcomm = 0$, an OOD probe) still yields $87.6\%$. What communication
-buys is efficiency, and it buys a lot of it: between $\rcomm = 0$ and
-$\rcomm = 10$, SPL rises from $0.492$ to $0.578$ and mission time falls from
-$61.7$ rounds to $49.6$, gains of $17\%$ and $20\%$, while redundancy drops as shared
+Communication is the more interesting axis, because there the success curve is
+all but flat: $96.8\text{--}98.0\%$ across the trained range, and severing fusion
+outright ($\rcomm = 0$, an OOD probe) still yields $95.6\%$, a spread of little
+more than two points whose confidence intervals barely separate. What
+communication buys is efficiency, and it buys a lot of it: between $\rcomm = 0$
+and $\rcomm = 12$, SPL rises from $0.635$ to $0.743$ and mission time falls from
+$61.6$ rounds to $49.3$ at its best, gains of $17\%$ and $20\%$, while redundancy
+drops by roughly a third as shared
 maps let drones avoid re-covering each other's ground. The asymmetry, then, is
 that vision governs both \emph{whether} and \emph{how well} the team searches,
 while communication governs only \emph{how well}. We take the latter up directly
@@ -237,26 +271,24 @@ bands the Wilson $95\%$ CI (success) or $\pm1$ standard deviation (return).}
 
 \paragraph{Density and budget: the difficulty axes.}
 Obstacle density is the one factor that dominates the task
-(Figure~\ref{fig:sweep-density}). Success falls smoothly from near-perfect in
-open fields ($99.0\%$ at $\rho = 0$, $96.2\%$ at the trained floor
-$\rho = 0.10$) to $53.4\%$ at the trained ceiling $\rho = 0.30$, and then
-collapses out-of-distribution to $34.6\%$ and $24.2\%$ at $\rho = 0.35, 0.40$,
-the only axis whose extrapolation fails outright. The mechanism is legible in the
-companion panels: as clutter rises, corridors narrow, drones are funnelled
-together (collisions and per-drone revisits climb sharply), coverage drops, and
-SPL falls as detours lengthen the winning path. Time-to-find is the one panel
-there not to read as a difficulty signal: averaged over successful episodes only,
-its \emph{drop} at the OOD densities ($66.4$ rounds at $\rho = 0.30$ against
-$21.1$ at $\rho = 0.40$) is survivorship, since at $24.2\%$ success the few
-episodes that still finish are those whose target happened to lie near the spawn
-corner.
+(Figure~\ref{fig:sweep-density}). Across its trained range success falls smoothly
+and substantially, from $99.0\%$ at the floor $\rho = 0.10$ to $83.6\%$ at the
+ceiling $\rho = 0.30$: fifteen points, more than any other in-distribution sweep
+costs. The obstacle-free extrapolation $\rho = 0$ is benign at $99.2\%$. The
+mechanism is legible in the companion panels: as clutter rises, corridors narrow
+and drones are funnelled together, collisions climbing from $3.5$ to $7.7$ per
+episode and per-drone revisits from $1.5$ to $14.2$ between $\rho = 0.10$ and
+$\rho = 0.30$, inter-drone overlap from $10.8\%$ to $38.2\%$, while coverage drops
+and SPL falls as detours lengthen the winning path.
 
-Part of this collapse, however, is not a policy failure at all. As noted in
-Section~\ref{subsec:prob-scenario}, reachability is guaranteed only from the
-reference corner $(0,0)$ while the team spawns on a uniformly chosen one, so a
-fraction of instances have no solution to find. Running a breadth-first search
-from the actual spawn on the very same $500$ seeds gives the \emph{solvable}
-fraction, and hence the highest success rate any controller could reach:
+Above the trained ceiling the curve stops being comparable, and the reason is
+worth stating carefully, because read naively it looks like the policy improving
+under harder conditions: success is $80.0\%$ at $\rho = 0.35$ but rebounds to
+$86.0\%$ at $\rho = 0.40$. What changes is the task, not the policy. Because the
+target is drawn from the free cells connected to the spawn
+(Section~\ref{subsec:prob-scenario}), the mission is confined to the spawn's
+connected component, and at high densities the free space fragments so that this
+component is a small part of the map:
 
 \begin{center}
 \small
@@ -264,26 +296,32 @@ fraction, and hence the highest success rate any controller could reach:
 \toprule
 $\rho$ & $0$ & $0.10$ & $0.15$ & $0.20$ & $0.25$ & $0.30$ & $0.35$ & $0.40$ \\
 \midrule
-Solvable [\%]          & $100.0$ & $98.6$ & $95.8$ & $91.4$ & $80.6$ & $65.4$ & $45.6$ & $30.4$ \\
-Success [\%]           & $99.0$  & $96.2$ & $94.4$ & $87.6$ & $75.6$ & $53.4$ & $34.6$ & $24.2$ \\
-Of achievable [\%]     & $99.0$  & $97.6$ & $98.5$ & $95.8$ & $93.8$ & $81.7$ & $75.9$ & $79.6$ \\
+Free cells [\%]                & $100.0$ & $90.1$ & $85.1$ & $80.1$ & $75.1$ & $70.1$ & $65.2$ & $60.2$ \\
+Spawn component [\% of free]   & $100.0$ & $99.6$ & $98.7$ & $96.2$ & $88.3$ & $74.8$ & $53.4$ & $22.9$ \\
+Spawn--target distance         & $31.1$  & $30.5$ & $31.6$ & $31.2$ & $30.3$ & $30.4$ & $26.1$ & $15.1$ \\
+Success [\%]                   & $99.2$  & $99.0$ & $98.6$ & $97.6$ & $94.2$ & $83.6$ & $80.0$ & $86.0$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \noindent
-Read this way the axis tells a more honest story: most of the drop is the
-instance distribution becoming unsolvable rather than the policy degrading, and
-even at the far OOD point the team still finds four targets in five of those
-that \emph{can} be found. Genuine degradation is present, and is concentrated
-between $\rho = 0.25$ and $\rho = 0.30$, where the achievable share falls from
-$94\%$ to $82\%$. The raw success rate remains the headline number, being what
-a deployed system would experience, but the OOD collapse of this axis is
-substantially structural and milder than the raw curve suggests.
+At $\rho = 0.40$ the team's reachable pocket averages $142$ cells, under a
+quarter of the free space and a seventh of the map, and the target sits a mean
+$15.1$ steps away instead of the $30$ that hold up to $\rho = 0.30$. The mission
+is simply half as long, which is why success recovers, why mission time collapses
+from $53.7$ rounds at $\rho = 0.30$ to $17.6$, and why SPL \emph{rises} to
+$0.775$: short searches in a confined pocket are close to optimal by
+construction. Coverage is the clearest casualty of the same effect, being
+measured against every free cell, so the $17.0\%$ it reports at $\rho = 0.40$ is
+bounded above by the $22.9\%$ the team can physically enter, the rest being
+visible across walls but never sweepable. The genuine difficulty peak therefore
+sits around $\rho = 0.30\text{--}0.35$, where the accessible region is still
+large but the corridors are narrow; the two highest densities measure a
+different, easier problem rather than a harder one.
 
 The step budget behaves as
-expected of a pure time constraint: success rises with $T$ ($49.0\%$ at $T=50$ to
-$89.8\%$ at $T=300$, Figure~\ref{fig:app-maxsteps}) with diminishing returns,
+expected of a pure time constraint: success rises with $T$ ($55.4\%$ at $T=50$ to
+$98.8\%$ at $T=300$, Figure~\ref{fig:app-maxsteps}) with diminishing returns,
 since a generous budget only helps episodes that were close to succeeding anyway.
 
 \begin{figure}[t]
@@ -291,19 +329,24 @@ since a generous budget only helps episodes that were close to succeeding anyway
 \includegraphics[width=0.95\textwidth]{fig_density.png}
 \caption{Sensitivity to obstacle density $\rho$, the one axis that governs
 difficulty. Shaded points ($\rho = 0$ and $\rho > 0.30$) are the OOD
-extrapolation, the trained range being $[0.10, 0.30]$. Note that
-time-to-find, averaged over successful episodes only, is a survivorship
-statistic at those densities rather than a difficulty signal.}
+extrapolation, the trained range being $[0.10, 0.30]$. The rebound in success
+at $\rho = 0.40$, and the accompanying drop in time-to-find and coverage, are
+the free space fragmenting: the mission is confined to the spawn's connected
+component, which by that density holds under a quarter of the free cells.}
 \label{fig:sweep-density}
 \end{figure}
 
 \paragraph{Learning curve.}
 Re-evaluating the periodic checkpoints at the reference operating point
-(Figure~\ref{fig:epoch}) shows success rising to a
-plateau around $79\text{--}86\%$ by roughly episode $25{,}000$ and holding, with
-SPL continuing to inch up afterward: the policy keeps refining \emph{how} it
-reaches targets after the \emph{whether} has largely converged. The intermediate
-dip around episodes $17{,}500\text{--}22{,}500$ (success $68\text{--}70\%$) falls
+(Figure~\ref{fig:epoch}) shows success reaching $92.3\%$ by episode $25{,}000$
+and then inching up over the remaining half of the run to $97.3\%$, with SPL
+climbing throughout ($0.39 \to 0.71$) and, on the same panels, mission time
+falling from $59.3$ to $54.3$ rounds and the two redundancy counters collapsing
+(collisions $24.7 \to 4.6$, per-drone revisits $29.9 \to 3.6$): the policy keeps
+refining \emph{how} it reaches targets long after the \emph{whether} has largely
+converged. The intermediate
+dip around episodes $17{,}500\text{--}22{,}500$ (success $77\text{--}82\%$, from
+$90.3\%$ at episode $10{,}000$) falls
 in the stretch where exploration has long since floored, $\varepsilon$ hitting
 $0.05$ at episode $5{,}990$, while the learning rate is still
 $67\text{--}82\%$ of its peak on the cosine schedule: large updates against a
@@ -319,9 +362,11 @@ Figure~\ref{fig:training-curves}.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.86\textwidth]{fig_epoch.png}
+\includegraphics[width=0.95\textwidth]{fig_epoch.png}
 \caption{Learning curve: every periodic checkpoint of the final run, evaluated
-greedily at the reference operating point ($300$ seeds per checkpoint).}
+greedily at the reference operating point ($300$ seeds per checkpoint), on the
+same six-panel layout as the sweeps above. Every point is in-distribution by
+construction, the operating point being fixed, so no shading applies.}
 \label{fig:epoch}
 \end{figure}
 
@@ -334,7 +379,7 @@ Figure~\ref{fig:fault} and Table~\ref{tab:fault} sweep the per-turn fault
 probability from the fault-free reference out to $\pfault = 0.01$, more than
 triple the trained maximum: a regime in which, over $200$ rounds, a drone's
 survival probability is only $0.99^{200} \approx 0.13$ and, at the reference team
-size $\nagents = 3$, roughly $1.5$ drones are lost per episode on average.
+size $\nagents = 3$, roughly $1.4$ drones are lost per episode on average.
 
 \begin{table}[t]
 \centering
@@ -346,20 +391,20 @@ $\pfault$ & \textbf{Success [\%]} & \textbf{Success [\%]} & \textbf{SPL} &
  & \textbf{policy} & \textbf{+ auto-nav} & \textbf{(policy)} &
 \textbf{/ episode} & \\
 \midrule
-$0.000$ & $87.6$ & $89.8$ & $0.541$ & $0.00$ & in-dist. \\
-$0.001$ & $86.0$ & $88.4$ & $0.532$ & $0.22$ & in-dist. \\
-$0.002$ & $84.4$ & $87.2$ & $0.517$ & $0.42$ & in-dist. \\
-$0.003$ & $82.0$ & $84.8$ & $0.505$ & $0.58$ & in-dist. \\
+$0.000$ & $97.6$ & $98.8$ & $0.715$ & $0.00$ & in-dist. \\
+$0.001$ & $96.0$ & $97.6$ & $0.695$ & $0.16$ & in-dist. \\
+$0.002$ & $93.6$ & $95.4$ & $0.682$ & $0.30$ & in-dist. \\
+$0.003$ & $91.0$ & $93.2$ & $0.666$ & $0.48$ & in-dist. \\
 \midrule
-$0.005$ & $77.2$ & $80.2$ & $0.480$ & $0.91$ & OOD \\
-$0.010$ & $66.2$ & $68.4$ & $0.404$ & $1.51$ & OOD \\
+$0.005$ & $85.4$ & $87.4$ & $0.631$ & $0.78$ & OOD \\
+$0.010$ & $72.6$ & $74.2$ & $0.536$ & $1.37$ & OOD \\
 \bottomrule
 \end{tabular}
 \caption{Fault robustness ($500$ seeds per point, reference operating point
-otherwise). Across the entire trained range the team loses at most $\sim6$
-percentage points of success while shedding on average more than half a
+otherwise). Across the entire trained range the team loses under $7$
+percentage points of success while shedding on average close to half a
 drone; degradation stays graceful well past the trained maximum. The BFS
-auto-nav hybrid is a consistent $\sim2\text{--}3$ points better, locating a
+auto-nav hybrid is a consistent $1\text{--}2$ points better, locating a
 small residual inefficiency in the policy's final approach rather than in its
 fault handling.}
 \label{tab:fault}
@@ -367,28 +412,32 @@ fault handling.}
 
 \paragraph{Graceful degradation.}
 The central result is that degradation is gentle and monotone. Across the
-\emph{entire} trained range the success rate falls only from $87.6\%$ to
-$82.0\%$, under six points, even though by $\pfault = 0.003$ the team is losing,
-on average, $0.58$ of its three drones per episode. Pushed to the $3.3\times$ OOD
-point $\pfault = 0.01$, success degrades to $66.2\%$ with $1.51$ drones lost: the
-policy sheds, on average, \emph{half} the team and still completes two missions
-in three. There is no cliff. This is the redundancy argued in
+\emph{entire} trained range the success rate falls only from $97.6\%$ to
+$91.0\%$, under seven points, even though by $\pfault = 0.003$ the team is losing,
+on average, $0.48$ of its three drones per episode. Pushed to the $3.3\times$ OOD
+point $\pfault = 0.01$, success degrades to $72.6\%$ with $1.37$ drones lost: the
+policy sheds, on average, close to \emph{half} the team and still completes
+nearly three missions in four. There is no cliff. This is the redundancy argued in
 Section~\ref{subsec:mas-resilience} made quantitative, since any surviving drone
 can complete the search, so the loss of some drones removes capacity rather than
 the mission; and it holds under a fault rate the policy was never trained on,
 evidence that the decentralized fault handling generalizes rather than memorizing
 the training range.
 
-\paragraph{Return rises while success falls.}
-Table~\ref{tab:fault} and the training scalars make the shaping artefact
-concrete: mean return \emph{rises} across the whole trained fault range
-($71.2 \to 86.4$, peaking at $89.8$ before ever-shorter episodes pull it back
-down) because wrecked drones stop incurring step penalties. Read naively, the
-reward says faults \emph{help}; read correctly, success says they hurt, slowly.
-The experiment is thus also a validation of the success-dominant
-model-selection rule of Section~\ref{subsec:train-correctness}: had we selected
-checkpoints on return, we would have preferred policies that let drones die
-quietly.
+\paragraph{Return, and why it still is not the ranking metric.}
+On solvable instances the shaping artefact does not surface on this axis: mean
+return falls monotonically with the fault rate ($149.2 \to 111.4$), tracking
+success. It is worth recording that this was not so on the earlier, partly
+unsolvable instance bank, where return \emph{rose} with the fault rate, faults
+cutting short exactly those hopeless episodes that would otherwise have spent
+the full budget accumulating step penalties. The mechanism has not gone away, it
+has only stopped dominating here: a wrecked drone still stops paying its
+per-turn penalty, and the team-size axis shows the same discrepancy in the open,
+mean return peaking at $\nagents = 2$ and falling to $108.6$ at $\nagents = 6$
+while success rises monotonically to $99.0\%$. Ranking on return would therefore
+still prefer small, slow teams and policies that let drones die quietly, which
+is precisely what the success-dominant model-selection rule of
+Section~\ref{subsec:train-correctness} exists to prevent.
 
 \begin{figure}[t]
 \centering
@@ -402,21 +451,21 @@ SPL and the mean number of drones lost per episode.}
 \paragraph{What the aggregate hides: how many drones actually die.}
 The mean loss counts of Table~\ref{tab:fault} average over very different
 episodes, so Figure~\ref{fig:nbroken} opens them up. Panel~(a) shows the full
-composition: even at the trained maximum $\pfault = 0.003$, a majority of
-episodes ($59\%$) still lose \emph{no} drone, and total wipe-outs are rare
-($3\%$); at the $3.3\times$ OOD point the picture inverts, with only $24\%$ of
-episodes fault-free and $27\%$ losing the entire team. Panel~(b) conditions
+composition: even at the trained maximum $\pfault = 0.003$, a clear majority of
+episodes ($64.6\%$) still lose \emph{no} drone, and total wipe-outs are rare
+($2.4\%$); at the $3.3\times$ OOD point the picture inverts, with only $30.4\%$ of
+episodes fault-free and $24.2\%$ losing the entire team. Panel~(b) conditions
 success on how many drones survived, and this is where the graceful-degradation
 claim becomes mechanical rather than rhetorical. A team that finishes intact
-succeeds $93.9\%$ of the time; losing one drone costs $14$ points ($79.8\%$), and
-even a lone survivor still finds the target in $52.6\%$ of episodes. That last
-figure sits $18$ points below the $71.0\%$ of a team that was \emph{born} alone,
+succeeds $98.7\%$ of the time; losing one drone costs six points ($92.5\%$), and
+even a lone survivor still finds the target in $65.9\%$ of episodes. That last
+figure sits $13$ points below the $79.0\%$ of a team that was \emph{born} alone,
 which is the honest reading of the cost of attrition: a sole survivor is not
 equivalent to a solo searcher, having lost part of the budget to a team that no
 longer exists and inheriting a partially swept map from a worse position. It
 remains, however, a degradation of degree rather than of kind. The $0\%$ bar at
 zero survivors is definitional, not a policy failure: an all-dead team truncates
-the episode, so those $200$ episodes are lost to the environment rather than to
+the episode, so those $176$ episodes are lost to the environment rather than to
 the policy.
 
 \begin{figure}[t]
@@ -431,7 +480,7 @@ is $0\%$ by construction, an all-dead team truncating the episode.}
 \end{figure}
 
 \paragraph{Where the small gap lives.}
-The auto-nav hybrid tracks the policy closely and a constant $2\text{--}3$ points
+The auto-nav hybrid tracks the policy closely and a constant $1\text{--}2$ points
 above it, at \emph{every} fault level (Figure~\ref{fig:fault}). Because auto-nav
 changes only the homing phase, this near-constant offset says the policy's
 residual weakness is a slightly sub-optimal final approach, not a failure to
@@ -456,18 +505,18 @@ though it may matter more for path quality.
 The communication axis doubles as a clean ablation, because $\rcomm = 0$ removes
 map fusion entirely without retraining or changing anything else.
 Figure~\ref{fig:sweep-comm} isolates it, and the result splits cleanly in two.
-Fusion is not what lets the team \emph{find} the target: success is $87.6\%$ with
-communication severed against $87\text{--}90\%$ over the whole range, a spread
-well inside the confidence intervals. It is what lets the team find it
-\emph{well}. Switching fusion on is worth between a seventh and a fifth of the
-team's efficiency on every measure the harness records. Between $\rcomm = 0$ and
-the trained maximum $\rcomm = 12$, SPL rises from $0.492$ to $0.587$ ($+19\%$),
-per-drone revisits fall from $9.9$ to $8.6$ ($-13\%$) and inter-drone overlap
-from $26.6\%$ to $21.0\%$ ($-21\%$), while mission time drops from $61.7$ rounds
-to $49.6$ at its best ($-20\%$). For a mechanism that costs nothing
-beyond being within range of a teammate, and that no reward term ever instructed
-the policy to exploit, taking something close to a fifth off the cost of a
-mission is a substantial return.
+Fusion is not what lets the team \emph{find} the target: success is $95.6\%$ with
+communication severed against $96.8\text{--}98.0\%$ over the trained range, a
+spread of little more than two points whose confidence intervals barely separate.
+It is what lets the team find it \emph{well}, and the effect there is
+substantial and consistent in sign on every measure the harness records. Between
+$\rcomm = 0$ and the trained maximum $\rcomm = 12$, SPL rises from $0.635$ to
+$0.743$ ($+17\%$), per-drone revisits fall from $4.5$ to $3.1$ ($-32\%$) and
+inter-drone overlap from $23.4\%$ to $16.6\%$ ($-29\%$), while mission time drops
+from $61.6$ rounds to $49.3$ at its best ($-20\%$). For a mechanism that costs
+nothing beyond being within range of a teammate, and that no reward term ever
+instructed the policy to exploit, taking a fifth off the cost of a mission and a
+third off its redundancy is a substantial return.
 
 The reading matters for the multi-agent analysis. Communication is not what
 \emph{creates} coordination here: with the channel cut the team still disperses
@@ -512,10 +561,10 @@ require trajectory-level logging.
 
 \paragraph{Complementary coverage is real and quantified.}
 Across the team-size sweep, the overlap between drones' swept regions stays low:
-at $\nagents = 4$ only $29.6\%$ of team-visited cells are entered by more than
-one drone, so roughly seven in ten cells are each the responsibility of a single
+at $\nagents = 4$ only $25.3\%$ of team-visited cells are entered by more than
+one drone, so three cells in four are each the responsibility of a single
 searcher. More tellingly, \emph{per-drone} revisits fall as the team grows, from
-$13.9$ at $\nagents = 1$ to about $8.8$ from $\nagents = 4$ on, where they
+$6.7$ at $\nagents = 1$ to about $3.3$ from $\nagents = 4$ on, where they
 flatten, even though total collisions rise: each drone individually wastes less
 effort re-treading its own ground as the map is partitioned among more searchers.
 This is exactly the complementarity predicted from local rules alone, no region
@@ -525,13 +574,18 @@ identity-conditioned sector partition the shared policy learned.
 \paragraph{Two interactions, read as heatmaps.}
 Figure~\ref{fig:heatmaps} confirms on $2$-D grids what the OFAT sweeps imply
 marginally. Team size $\times$ communication (left) shows success governed almost
-entirely by $\nagents$, with the $\rcomm$ direction nearly flat at every team
-size: the communication finding above, now visibly independent of team size.
+entirely by $\nagents$, climbing from the $75\text{--}78\%$ band at
+$\nagents = 1$ to $97\text{--}99.7\%$ at $\nagents = 4$, while the $\rcomm$
+direction moves it by at most a couple of points at any team size: the
+communication finding above, now visibly independent of team size.
 Vision $\times$ density (right) shows the reverse: density sets the achievable
 success band, and vision helps at low-to-moderate clutter, where seeing farther
-translates into faster coverage (the $\rvis = 1 \to 6$ gain peaks at
-$+15.7$ points at $\rho = 0.2$), while in dense clutter it is worth almost
-nothing, the extra sight lines being wasted on walls. The two dominant factors of the whole study, how \emph{many}
+translates into faster coverage (the $\rvis = 1 \to 6$ gain is
+$+17.3$ points at $\rho = 0.1$ and $+16.7$ at $\rho = 0.2$), shrinks to
+$+7.0$ at $\rho = 0.3$, where the extra sight lines are wasted on walls, and
+turns slightly negative ($-8.7$) at $\rho = 0.4$, the row on which the mission
+has collapsed into the spawn's pocket and the sweep is no longer measuring the
+same task. The two dominant factors of the whole study, how \emph{many}
 drones and how \emph{cluttered} the world, are exactly the two that these
 interaction grids single out.
 
@@ -587,18 +641,28 @@ the case the security discussion of the next section must contend with.
 \emph{Statistical, not formal, evidence.} Success rates on $500$ seeds with
 Wilson intervals bound sampling error, not worst-case behaviour: nothing here
 certifies how the opaque learned policy acts on a specific unseen instance, a gap
-Section~\ref{subsec:eth-responsibility} returns to. The OOD probes show graceful
-extrapolation on the axes tested but do not guarantee it in general, density
-already showing where extrapolation fails.
+Section~\ref{subsec:eth-responsibility} returns to. That no axis tested shows a
+cliff is weaker evidence than it looks, five one-dimensional probes and two
+$2$-D grids leaving most of the joint space unvisited.
 
-\emph{The instances are not all solvable.} Reachability is guaranteed from the
-reference corner while the team spawns on a random one, so a density-dependent
-fraction of episodes has no solution to find. Every success rate here is
-therefore measured against a ceiling below $100\%$: the table above separates
-the two effects on the density axis, and the remaining sweeps, all run at
-$\rho = 0.2$, carry an unstated $8.6\%$ floor of impossible instances. Seeding
-reachability from the drawn corner would remove the mismatch, at the cost of
-making every number reported here incomparable with the new ones.
+\emph{High-density instances measure a different task.} Guaranteeing the target
+reachable from the spawn makes every instance solvable, but it also ties the
+mission to the spawn's connected component, and above $\rho \approx 0.30$ the
+free space fragments: at $\rho = 0.40$ that component holds under a quarter of
+the free cells and the target sits half as far away. Success, time-to-find, SPL
+and coverage at those densities are therefore not commensurable with the trained
+range, and the coverage metric in particular stops measuring exploration
+effectiveness, its denominator counting cells no drone could ever enter. The
+in-distribution part of the density sweep is unaffected, the spawn component
+still holding $75\text{--}99\%$ of the free space throughout.
+
+\emph{Training and evaluation used different instance distributions.} The
+evaluated weights come from a run whose generator anchored reachability to
+$(0,0)$ rather than to the drawn spawn corner, so roughly one training episode in
+eight had no solution (Section~\ref{subsec:exp-setup}). A policy retrained on the
+corrected generator would plausibly do better still, having spent none of its
+samples on impossible instances, but that is a conjecture this report does not
+test.
 
 \emph{Instrumentation gaps.} The belief-lag / fault$\times$comm interaction and
 two of the three emergence signatures were defined but not measured, for want of

@@ -46,23 +46,24 @@ episode.}
 \subsection{Scenario}
 \label{subsec:prob-scenario}
 
-The environment is an episodic grid world. At the beginning of every episode a
-fresh $\gridsize\times\gridsize$ occupancy grid is generated: each cell is
-independently declared an obstacle with probability $\rho$, and a single target
-cell $g$ is placed uniformly at random among the free cells that are reachable
-(under 4-connectivity) from the reference corner
-$(0,0)$.\footnote{Reachability is verified with a breadth-first search from
-$(0,0)$ at generation time; layouts whose reachable region is empty are rejected
-and resampled. The guarantee therefore concerns $(0,0)$ alone, and $(0,0)$ is
-also the only corner forced free: since the team spawns on a uniformly chosen
-corner, the target is in fact unreachable from the actual spawn in $1.4\%$ of
-episodes at $\rho = 0.10$, $8.6\%$ at $\rho = 0.20$ and $69.6\%$ at
-$\rho = 0.40$. That is a property of the instance distribution, not of the
-policy; it imposes a density-dependent ceiling on the success rates of
-Section~\ref{sec:experiments}, quantified in
+The environment is an episodic grid world. At the beginning of every episode one
+of the four map corners is drawn uniformly as the \emph{spawn corner}, and a
+fresh $\gridsize\times\gridsize$ occupancy grid is then generated around it: each
+cell is independently declared an obstacle with probability $\rho$, the spawn
+cell is forced free, and a single target cell $g$ is placed uniformly at random
+among the free cells reachable from the spawn under
+4-connectivity.\footnote{Reachability is verified with a breadth-first search
+from the spawn cell at generation time; layouts whose reachable region is empty
+are rejected and resampled. Drawing the corner \emph{before} the layout is what
+makes the guarantee bind: anchoring it to a fixed reference corner while the
+team spawns elsewhere would leave a density-dependent fraction of episodes with
+no solution to find, since at these densities the free space is often
+disconnected. The guarantee is exact but local, and at high $\rho$ it confines
+the mission to the spawn's connected component, which shrinks with clutter; the
+consequences for the density sweep are quantified in
 Section~\ref{subsec:exp-generalization}.} A team of
-$\nagents$ drones spawns \emph{co-located} on one randomly chosen corner of the
-map. The target position is unknown to the drones;
+$\nagents$ drones spawns \emph{co-located} on that corner.
+The target position is unknown to the drones;
 obstacles are likewise unknown until observed.
 
 Each drone occupies one cell and, on its turn, moves to one of the four

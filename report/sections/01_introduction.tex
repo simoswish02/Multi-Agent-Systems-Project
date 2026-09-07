@@ -30,7 +30,7 @@ as first-class design objects.
 Concretely, we study the following task, formalized in
 Section~\ref{sec:problem}. A team of $\nagents$ drones spawns co-located on a
 corner of a $\gridsize\times\gridsize$ occupancy grid scattered with obstacles;
-a single target, drawn from the region reachable from the reference corner, is
+a single target, drawn from the region reachable from that corner, is
 hidden at an unknown cell. Each drone
 sees only a window of radius $\rvis$ around itself, remembers what it has seen,
 and fuses its accumulated map with any teammate within communication range
@@ -111,9 +111,9 @@ The report makes the following contributions:
     that the policy generalizes without a cliff across team size, vision and
     communication, including \emph{beyond} the ranges it was trained on, while
     obstacle density is the one axis that genuinely governs difficulty; and, as
-    the headline result, that success falls by under six points across the
-    entire trained fault range and still reaches $66\%$ at more than triple that
-    rate, where half the team is lost on average, with no cliff.
+    the headline result, that success falls by under seven points across the
+    entire trained fault range and still reaches $72.6\%$ at more than triple
+    that rate, where close to half the team is lost on average, with no cliff.
   \item \emph{A prospective ethical and regulatory analysis}
     (Section~\ref{sec:ethics}): the capability's dual-use profile, its treatment
     under the GDPR and the EU AI Act (including the military carve-out that
