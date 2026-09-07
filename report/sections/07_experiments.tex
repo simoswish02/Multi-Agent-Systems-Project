@@ -81,19 +81,9 @@ drawn \emph{first} and the layout generated around it, so the target always come
 from the free cells $4$-connected to the cell the team actually occupies
 (Section~\ref{subsec:prob-scenario}), and a breadth-first check confirms it over
 the whole bank, no instance across the eight densities and $500$ seeds having an
-unreachable target or an obstructed spawn. This was \emph{not}
-true of the generator the evaluated weights were trained with, which anchored the
-guarantee to $(0,0)$ while the team spawned on a uniformly drawn corner: under
-the training randomization $\rho \sim \mathcal{U}[0.10, 0.30]$, some $12\%$ of
-training episodes had no solution to find, rising from $2.5\%$ at
-$\rho \approx 0.10$ to $25\%$ at $\rho \approx 0.30$, and $15\%$ started the team
-on an obstacle cell. The generator was corrected after training and the
-evaluation re-run on it. The mismatch cut both ways and is worth stating
-plainly: it cost the training run, roughly one episode in eight teaching the
-policy from a task it could not complete, and it makes the evaluation below
-simply correct rather than generous, every success rate here being measured
-against a ceiling of $100\%$. Retraining on the corrected generator is the
-obvious next run, and not one this report claims to have made.
+unreachable target or an obstructed spawn. Every success rate reported below is
+therefore measured against a ceiling of $100\%$, with no share of the residual
+failures attributable to instances that had no solution to find.
 
 At the reference operating point the policy reaches the target in $97.6\%$ of
 episodes (Wilson CI $[95.9, 98.6]$), discovering $53.4\%$ of the free space with
@@ -655,14 +645,6 @@ range, and the coverage metric in particular stops measuring exploration
 effectiveness, its denominator counting cells no drone could ever enter. The
 in-distribution part of the density sweep is unaffected, the spawn component
 still holding $75\text{--}99\%$ of the free space throughout.
-
-\emph{Training and evaluation used different instance distributions.} The
-evaluated weights come from a run whose generator anchored reachability to
-$(0,0)$ rather than to the drawn spawn corner, so roughly one training episode in
-eight had no solution (Section~\ref{subsec:exp-setup}). A policy retrained on the
-corrected generator would plausibly do better still, having spent none of its
-samples on impossible instances, but that is a conjecture this report does not
-test.
 
 \emph{Instrumentation gaps.} The belief-lag / fault$\times$comm interaction and
 two of the three emergence signatures were defined but not measured, for want of

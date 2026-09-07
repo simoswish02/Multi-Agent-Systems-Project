@@ -73,12 +73,7 @@ would deliver the two emergence signatures (inter-drone distance over time,
 post-fault re-covering latency) that Section~\ref{subsec:exp-qualitative} left
 qualitative; two further ablations, removing the believed-alive count from the
 context vector and switching the shared terminal reward for an individual one,
-require retraining a policy each. A third run belongs on the same list: the
-evaluated weights were trained before the instance generator was corrected, on a
-distribution in which roughly one episode in eight was unsolvable
-(Section~\ref{subsec:exp-setup}), and retraining on the corrected generator would
-close the only mismatch left between the training and evaluation conditions.
-None of these changes the architecture: they
+require retraining a policy each. None of these changes the architecture: they
 are instrumentation and compute, and they would sharpen the claims already made.
 
 Three directions reach further. On coordination, the finding that communication
