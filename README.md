@@ -20,7 +20,7 @@ network as a context vector.
 | Artefact | Location |
 |---|---|
 | Report (49 pp.) | [`report/main.pdf`](report/main.pdf) |
-| Video walkthrough (approx. 4 min) | <https://youtu.be/az1LtAcZYZo> |
+| Video walkthrough (approx. 4 min) | <https://youtu.be/8dnRG6ZneP8> |
 | Trained weights | [`simoswish/MAS_MultiDroneExploration`](https://huggingface.co/simoswish/MAS_MultiDroneExploration) (Hugging Face) |
 | Experimental results | [`testing_results/`](testing_results/) (CSVs and figures for Section 7) |
 | Analysis notebook | [`testing/analysis.ipynb`](testing/analysis.ipynb) (executed; sole source of the report's figures) |

@@ -75,16 +75,6 @@ found. This is precisely the shaping-versus-task discrepancy that motivated the
 success-dominant checkpoint rule of Section~\ref{subsec:train-correctness}; we
 therefore read success rate, not return, as the primary metric throughout.
 
-\paragraph{The instance distribution.}
-Every instance evaluated here is solvable by construction: the spawn corner is
-drawn \emph{first} and the layout generated around it, so the target always comes
-from the free cells $4$-connected to the cell the team actually occupies
-(Section~\ref{subsec:prob-scenario}), and a breadth-first check confirms it over
-the whole bank, no instance across the eight densities and $500$ seeds having an
-unreachable target or an obstructed spawn. Every success rate reported below is
-therefore measured against a ceiling of $100\%$, with no share of the residual
-failures attributable to instances that had no solution to find.
-
 At the reference operating point the policy reaches the target in $97.6\%$ of
 episodes (Wilson CI $[95.9, 98.6]$), discovering $53.4\%$ of the free space with
 an SPL of $0.715$: the anchor every one-factor sweep below passes through. The
