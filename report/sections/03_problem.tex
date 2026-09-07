@@ -32,7 +32,7 @@ $\pfault$ & $\pfault \in [0, 0.003]$ & per-turn fault probability of a live dron
 $\beta_i^t \in \{0,1\}$ & --- & alive flag of drone $i$ ($0$ = broken, permanent) \\
 $K_i^t$ & --- & knowledge state (accumulated maps) of drone $i$ \\
 $\mathcal{C}_i^t$, $\hat{n}_i^t$ & --- & crashed teammates \emph{known} to $i$; believed alive count \\
-$T_{\max}$ & $200 \cdot \nagents$ & episode budget in agent-turns \\
+$T$, $T_{\max}$ & $T = 200$, $T_{\max} = T\cdot\nagents$ & per-drone step budget; episode budget in agent-turns \\
 $\gamma$ & $0.97$ & discount factor \\
 \bottomrule
 \end{tabular}

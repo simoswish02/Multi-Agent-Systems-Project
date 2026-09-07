@@ -567,7 +567,7 @@ class CnnQNetwork(nn.Module):
         local_feat  = self.local_cnn(local_patch, global_feat)           # (B, 384)
 
         combined = self.combined_norm(
-            torch.cat([global_feat, local_feat, ctx], dim=1)             # (B, 1024+384+3)
+            torch.cat([global_feat, local_feat, ctx], dim=1)             # (B, 1024+384+5)
         )
 
         h = self.fc3(self.fc2(self.fc1(combined)))   # (B, fc_hidden // 4)

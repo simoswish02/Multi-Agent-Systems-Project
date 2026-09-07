@@ -6,7 +6,7 @@
 #   make simulate     GUI setup screen (fault slider, auto-nav toggle)
 #   make experiments  the four evaluation sweeps behind Section 7
 #   make figures      regenerate every figure of the report
-#   make report       compile report/main.pdf
+#   make report       compile report/Rimondi-MultiDroneSearch-MAS.pdf
 #   make all          figures + report
 #   make clean        remove LaTeX build artefacts and __pycache__
 #
@@ -68,14 +68,14 @@ figures:
 # latexmk is not used: it needs perl, which the authoring machine lacks.
 
 report:
-	cd report && pdflatex -interaction=nonstopmode main.tex \
-	  && bibtex main \
-	  && pdflatex -interaction=nonstopmode main.tex \
-	  && pdflatex -interaction=nonstopmode main.tex
+	cd report && pdflatex -interaction=nonstopmode Rimondi-MultiDroneSearch-MAS.tex \
+	  && bibtex Rimondi-MultiDroneSearch-MAS \
+	  && pdflatex -interaction=nonstopmode Rimondi-MultiDroneSearch-MAS.tex \
+	  && pdflatex -interaction=nonstopmode Rimondi-MultiDroneSearch-MAS.tex
 
 clean:
-	rm -f report/main.aux report/main.bbl report/main.blg report/main.log \
-	      report/main.out report/main.toc report/sections/*.aux
+	rm -f report/*.aux report/*.bbl report/*.blg report/*.log \
+	      report/*.out report/*.toc report/sections/*.aux
 	rm -rf __pycache__ */__pycache__ */*/__pycache__
 
 help:

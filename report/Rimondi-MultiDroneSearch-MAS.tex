@@ -26,6 +26,16 @@
 
 \usepackage[hidelinks,colorlinks=true,linkcolor=black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
 
+% Document metadata: without these the PDF ships with an empty /Title and
+% /Author, and viewers fall back to displaying the file name.
+\hypersetup{
+  pdftitle={Multi-Drone Cooperative Search with Random Faults},
+  pdfauthor={Simone Rimondi},
+  pdfsubject={Multi-Agent Systems project, MSc Artificial Intelligence, University of Bologna, A.Y. 2025/2026},
+  pdfkeywords={multi-agent systems, deep reinforcement learning, Dueling Double DQN,
+               parameter sharing, fault tolerance, partial observability, domain randomization}
+}
+
 % Figures live in report/figures/ (exported plots, diagrams, screenshots).
 \graphicspath{{figures/}}
 

@@ -19,7 +19,7 @@ network as a context vector.
 
 | Artefact | Location |
 |---|---|
-| Report (49 pp.) | [`report/main.pdf`](report/main.pdf) |
+| Report (49 pp.) | [`report/Rimondi-MultiDroneSearch-MAS.pdf`](report/Rimondi-MultiDroneSearch-MAS.pdf) |
 | Video walkthrough (approx. 4 min) | <https://youtu.be/8dnRG6ZneP8> |
 | Trained weights | [`simoswish/MAS_MultiDroneExploration`](https://huggingface.co/simoswish/MAS_MultiDroneExploration) (Hugging Face) |
 | Experimental results | [`testing_results/`](testing_results/) (CSVs and figures for Section 7) |
@@ -84,7 +84,7 @@ this repository; it is published on Hugging Face together with the 20 periodic
 checkpoints behind the learning curve:
 
 ```bash
-huggingface-cli download simoswish/MAS_MultiDroneExploration \
+hf download simoswish/MAS_MultiDroneExploration \
     mas_50k_dr_faults_ep50000.pt --local-dir checkpoints/
 ```
 
@@ -146,7 +146,7 @@ testing_results/      CSVs and plots produced by those sweeps
 gui/                  pygame renderer and simulation setup screen
 demo/                 code that renders the video walkthrough
 hpc/                  SLURM batch scripts used to produce the results
-report/               LaTeX sources, figures and the compiled main.pdf
+report/               LaTeX sources, figures and the compiled PDF
 configs/default.yaml  all parameters (env, DR, curriculum, agent, training)
 main.py               entry point: train / eval / play / simulate
 eval_checkpoints.py   offline checkpoint ranking (batch or --watch)
@@ -154,7 +154,8 @@ eval_checkpoints.py   offline checkpoint ranking (batch or --watch)
 
 ## Documentation
 
-[`report/main.pdf`](report/main.pdf) documents this codebase as well as the
+[`report/Rimondi-MultiDroneSearch-MAS.pdf`](report/Rimondi-MultiDroneSearch-MAS.pdf)
+documents this codebase as well as the
 results. Section 3 formalizes the problem, Section 4 covers the environment,
 the observation channels and the network, Section 5 the training pipeline,
 Section 6 reads the system through the multi-agent paradigm and Section 7

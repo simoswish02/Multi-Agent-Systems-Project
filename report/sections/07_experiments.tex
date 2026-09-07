@@ -27,8 +27,8 @@ natural evaluation is a controlled \emph{one-factor-at-a-time} (OFAT) sweep: we
 vary one factor at a time and
 hold the others at a fixed \emph{reference operating point}, namely team size
 $\nagents = 3$, vision $\rvis = 3$, communication $\rcomm = 5$, obstacle density
-$\rho = 0.2$, step budget $T = 200$ and no faults, which is the configuration
-file's default operating point and sits near the centre of the training ranges
+$\rho = 0.2$, step budget $T = 200$ and no faults, which is the operating point
+of the training run itself and sits near the centre of the randomization ranges
 of Table~\ref{tab:notation}. This maps each axis without the
 exponential cost of a full grid; the two interactions we do examine jointly are
 reported as heatmaps in Section~\ref{subsec:exp-qualitative}. Each configuration
@@ -485,10 +485,9 @@ though it may matter more for path quality.
 The communication axis doubles as a clean ablation, because $\rcomm = 0$ removes
 map fusion entirely without retraining or changing anything else.
 Figure~\ref{fig:sweep-comm} isolates it, and the result splits cleanly in two.
-Fusion is not what lets the team \emph{find} the target: success is $95.6\%$ with
-communication severed against $96.8\text{--}98.0\%$ over the trained range, a
-spread of little more than two points whose confidence intervals barely separate.
-It is what lets the team find it \emph{well}, and the effect there is
+Fusion is not what lets the team \emph{find} the target, as the flat success
+curve of Section~\ref{subsec:exp-generalization} already showed. It is what lets
+the team find it \emph{well}, and the effect there is
 substantial and consistent in sign on every measure the harness records. Between
 $\rcomm = 0$ and the trained maximum $\rcomm = 12$, SPL rises from $0.635$ to
 $0.743$ ($+17\%$), per-drone revisits fall from $4.5$ to $3.1$ ($-32\%$) and
@@ -556,8 +555,9 @@ Figure~\ref{fig:heatmaps} confirms on $2$-D grids what the OFAT sweeps imply
 marginally. Team size $\times$ communication (left) shows success governed almost
 entirely by $\nagents$, climbing from the $75\text{--}78\%$ band at
 $\nagents = 1$ to $97\text{--}99.7\%$ at $\nagents = 4$, while the $\rcomm$
-direction moves it by at most a couple of points at any team size: the
-communication finding above, now visibly independent of team size.
+direction moves it by at most a few points at any team size, well within
+overlapping confidence intervals: the communication finding above, now visibly
+independent of team size.
 Vision $\times$ density (right) shows the reverse: density sets the achievable
 success band, and vision helps at low-to-moderate clutter, where seeing farther
 translates into faster coverage (the $\rvis = 1 \to 6$ gain is
