@@ -24,11 +24,6 @@ to the network as a context vector.
 | 🎬 **Video walkthrough** | **<https://youtu.be/az1LtAcZYZo>** (~4 min, generated end to end from code) |
 | 🧠 **Trained weights** | [`simoswish/MAS_MultiDroneExploration`](https://huggingface.co/simoswish/MAS_MultiDroneExploration) on Hugging Face |
 | 📊 **Results** | [`testing_results/`](testing_results/) — every CSV and figure behind Section 7 |
-
-> **Note (re-evaluation in progress).** The instance generator was corrected so
-> that target reachability is guaranteed from the corner the team actually
-> spawns on, rather than from `(0,0)` alone. The CSVs, figures and report
-> currently in this repository predate that fix; they are being regenerated.
 | 🔬 **Analysis** | [`testing/analysis.ipynb`](testing/analysis.ipynb) — executed, the single source of the report's figures |
 
 Repositories: [GitLab](https://dvcs.apice.unibo.it/pika-lab/courses/ai-ethics/projects/rimondi2526-mas)

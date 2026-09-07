@@ -13,6 +13,11 @@
 #SBATCH --gres=gpu:1
 
 # Keep temp files off the tiny node-local /tmp (~2G free); use scratch.
+# Stream stdout as it is produced: SLURM redirects it to a file, and
+# Python block-buffers a redirected stdout, so progress lines otherwise
+# only appear when the buffer fills or the job ends.
+export PYTHONUNBUFFERED=1
+
 export TMPDIR=/scratch.hpc/simone.rimondi5/tmp
 mkdir -p "$TMPDIR"
 

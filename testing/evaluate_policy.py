@@ -486,8 +486,13 @@ def run_heatmaps(base_config, agent, ctx_norm, grid_size, device, seeds, out_dir
                     else:
                         env_over[nm] = val
                 env  = make_env(base_config, env_over)
+                # Same tqdm treatment as the other two sweeps: a heatmap cell is
+                # hundreds of episodes and the per-cell print alone leaves a
+                # redirected log looking stalled for minutes at a time.
+                it   = tqdm(seeds, desc=f"  [{name}] {xn}={xv:<4} {yn}={yv:<4}",
+                            ncols=88, leave=False) if TQDM else seeds
                 rows = [rollout_episode(env, agent, ctx, ctx_norm, grid_size, device, s)
-                        for s in seeds]
+                        for s in it]
                 env.close()
                 a  = aggregate(name, f"{xv}x{yv}", True, rows)
                 out_rows.append({"x_name": xn, "x": xv, "y_name": yn, "y": yv,
