@@ -1,4 +1,4 @@
-timestamp   : 2026-07-14T01:13:38.580454
+timestamp   : 2026-09-07T02:31:46.826560
 checkpoint  : checkpoints/mas_50k_dr_faults_ep50000.pt
 seeds       : 500 (2000..2499)
 ood         : True
