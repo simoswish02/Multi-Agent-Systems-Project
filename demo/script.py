@@ -138,13 +138,13 @@ BEATS = [
 
     # -- 6. Outro ----------------------------------------------------------
     Beat("b60", "s6",
-         "Teams of six it never trained on still succeed nine times in ten. "
-         "Across the whole trained failure range, success drops under six "
-         "points.",
+         "Teams of six it never trained on succeed ninety-nine times in a "
+         "hundred. Across the whole trained failure range, success drops under "
+         "seven points.",
          min_s=9.5),
     Beat("b61", "s6",
          "At triple the worst failure rate it ever saw, it still completes "
-         "two missions in three. It degrades. It does not collapse.",
+         "nearly three missions in four. It degrades. It does not collapse.",
          min_s=9.5, pad_s=1.6),
 ]
 
